@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
 <style>
 :root {
   --run:#e05a2b; --rest:#3a7ca5; --warm:#f0a500; --go:#2d9e5f;
@@ -124,6 +125,7 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
 .t-map{height:130px;flex-shrink:0;position:relative;background:#1a1a2e;}
 .t-map-overlay{position:absolute;top:8px;left:8px;z-index:400;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:600;color:white;}
 .t-map-nogps{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:rgba(255,255,255,.3);font-size:.8rem;}
+.t-map-rotate{position:absolute;top:8px;right:8px;z-index:400;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border:none;border-radius:8px;padding:5px 10px;font-size:.72rem;font-weight:700;color:white;cursor:pointer;}
 
 /* controls */
 .t-controls{padding:12px 16px calc(12px);flex-shrink:0;display:flex;gap:10px;}
@@ -412,6 +414,7 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
 
   <div class="t-map" id="t-map">
     <div class="t-map-overlay" id="t-map-label">GPS 대기중...</div>
+    <button class="t-map-rotate" id="t-map-rotate" onclick="toggleMapRotate()">🧭 진행방향</button>
     <div class="t-map-nogps" id="t-map-nogps" style="display:none">
       <span style="font-size:1.5rem">📍</span>
       <span id="t-map-nogps-title">GPS 신호 없음</span>
@@ -649,6 +652,7 @@ let locked = false, lockPressTimer = null;
 let gpsWatch = null, gpsCoords = [], gpsMap = null, gpsPolyline = null, gpsMarker = null;
 let wakeLock = null;
 let detailIdx = null;
+let mapRotate = localStorage.getItem('run-maprotate') !== '0'; // 기본: 진행방향 회전 ON
 
 // ════════════════════════════════════════
 // NAVIGATION
@@ -911,8 +915,20 @@ function finishWorkout() {
   // RPE 추천
   const rec = PROGS[curProg]?.rec || '—';
   document.getElementById('rpe-rec-txt').textContent = `${PROGS[curProg]?.name} → RPE ${rec}`;
-  document.getElementById('ef-dist').value = '';
-  document.getElementById('ef-pace').value = '';
+  // GPS로 측정한 거리·페이스를 자동 입력 (필요하면 사용자가 수정 가능)
+  const gpsDist = gpsCoords.length > 1 ? calcTotalDist(gpsCoords) : 0;
+  if (gpsDist > 0.01) {
+    document.getElementById('ef-dist').value = gpsDist.toFixed(2);
+    if (elapsed > 0) {
+      const pace = (elapsed / 60) / gpsDist; // 분/km (소수)
+      document.getElementById('ef-pace').value = pace.toFixed(1);
+    } else {
+      document.getElementById('ef-pace').value = '';
+    }
+  } else {
+    document.getElementById('ef-dist').value = '';
+    document.getElementById('ef-pace').value = '';
+  }
   document.getElementById('ef-memo').value = '';
   document.getElementById('rpe-modal').classList.add('show');
 }
@@ -946,9 +962,31 @@ function initTimerMap() {
     return;
   }
   const el = document.getElementById('t-map');
-  gpsMap = L.map(el, {zoomControl:false, attributionControl:false}).setView([37.5665, 126.9780], 16);
+  // rotate:true → leaflet-rotate 플러그인이 있으면 map.setBearing() 사용 가능 (없으면 일반 지도)
+  gpsMap = L.map(el, {zoomControl:false, attributionControl:false, rotate:true, rotateControl:false, touchRotate:false}).setView([37.5665, 126.9780], 16);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(gpsMap);
   gpsPolyline = L.polyline([], {color:'#e05a2b', weight:4, opacity:.9}).addTo(gpsMap);
+  updateRotateBtn();
+}
+
+// 진행방향 회전 토글
+function toggleMapRotate() {
+  mapRotate = !mapRotate;
+  localStorage.setItem('run-maprotate', mapRotate ? '1' : '0');
+  updateRotateBtn();
+  if (!mapRotate && gpsMap && gpsMap.setBearing) gpsMap.setBearing(0); // 북쪽 고정으로 복귀
+}
+function updateRotateBtn() {
+  const btn = document.getElementById('t-map-rotate');
+  if (btn) btn.textContent = mapRotate ? '🧭 진행방향' : '🔒 북쪽고정';
+}
+
+// 두 좌표 사이의 진행 방위각(0~360°, 북=0, 동=90)
+function bearingBetween(la1, lo1, la2, lo2) {
+  const φ1 = la1*Math.PI/180, φ2 = la2*Math.PI/180, Δλ = (lo2-lo1)*Math.PI/180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return (Math.atan2(y, x)*180/Math.PI + 360) % 360;
 }
 
 // GPS 사용 불가 안내 표시 헬퍼
@@ -985,6 +1023,17 @@ function startGPS() {
         gpsMarker.setLatLng(coord);
       }
       gpsMap.panTo(coord);
+      // 진행방향 회전(course-up): GPS heading 우선, 없으면 직전 좌표와의 방위각으로 계산
+      if (mapRotate && gpsMap.setBearing) {
+        let heading = (pos.coords.heading != null && !isNaN(pos.coords.heading)) ? pos.coords.heading : null;
+        if (heading == null && gpsCoords.length >= 2) {
+          const a = gpsCoords[gpsCoords.length - 2], b = gpsCoords[gpsCoords.length - 1];
+          // 3m 이상 실제로 이동했을 때만 방향 갱신(정지 중 지도 빙빙 도는 것 방지)
+          if (haversine([a[0], a[1]], [b[0], b[1]]) > 0.003) heading = bearingBetween(a[0], a[1], b[0], b[1]);
+        }
+        // 진행방향이 위를 향하도록 지도를 회전. 방향이 반대로 돌면 -heading → heading 으로 바꾸세요.
+        if (heading != null) gpsMap.setBearing(-heading);
+      }
     }
     // 거리 계산
     if (gpsCoords.length >= 2) {
