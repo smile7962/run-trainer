@@ -448,7 +448,26 @@ html, body {
 .yt-search-arrow { padding-right: 14px; font-size: 1.3rem; flex-shrink: 0; }
 
 /* ── RECORD PAGE ── */
-.record-content { padding: 16px; }
+.record-content { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+/* ── BMI CARD ── */
+.bmi-card { background: var(--ink); border-radius: 16px; padding: 18px; }
+.bmi-card-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 14px; }
+.bmi-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.bmi-field label { display: block; font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; letter-spacing: 0.05em; }
+.bmi-field input { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 12px; color: white; font-size: 1rem; font-weight: 600; box-sizing: border-box; outline: none; }
+.bmi-field input:focus { border-color: var(--run); }
+.bmi-result { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px; }
+.bmi-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 0; margin-bottom: 16px; }
+.bmi-item { text-align: center; border-right: 1px solid rgba(255,255,255,0.1); padding: 0 6px; }
+.bmi-item:last-child { border-right: none; }
+.bmi-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; color: var(--run); line-height: 1; }
+.bmi-lbl { font-size: 0.62rem; color: rgba(255,255,255,0.4); margin-top: 3px; letter-spacing: 0.04em; }
+.calorie-row { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; }
+.calorie-label { font-size: 0.75rem; font-weight: 700; margin-bottom: 8px; }
+.calorie-programs { display: flex; flex-direction: column; gap: 5px; }
+.calorie-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; }
+.calorie-item .c-prog { color: rgba(255,255,255,0.65); }
+.calorie-item .c-kcal { font-weight: 700; color: var(--run); font-family: 'Bebas Neue', sans-serif; font-size: 0.95rem; }
 .stat-banner {
   background: var(--ink);
   color: white;
@@ -769,6 +788,41 @@ html, body {
       <div class="stat-item"><div class="stat-val" id="stat-time">0</div><div class="stat-lbl">총 분</div></div>
       <div class="stat-item"><div class="stat-val" id="stat-streak">0</div><div class="stat-lbl">연속일</div></div>
     </div>
+    <!-- 체중/BMI 카드 -->
+    <div class="bmi-card">
+      <div class="bmi-card-title">⚖️ 내 신체 정보</div>
+      <div class="bmi-inputs">
+        <div class="bmi-field">
+          <label>키 (cm)</label>
+          <input type="number" id="input-height" placeholder="170" min="100" max="250" oninput="calcBMI()">
+        </div>
+        <div class="bmi-field">
+          <label>체중 (kg)</label>
+          <input type="number" id="input-weight" placeholder="65" min="20" max="300" step="0.1" oninput="calcBMI()">
+        </div>
+      </div>
+      <div id="bmi-result" class="bmi-result" style="display:none">
+        <div class="bmi-row">
+          <div class="bmi-item">
+            <div class="bmi-val" id="bmi-val">—</div>
+            <div class="bmi-lbl">BMI</div>
+          </div>
+          <div class="bmi-item">
+            <div class="bmi-val" id="bmi-status">—</div>
+            <div class="bmi-lbl">판정</div>
+          </div>
+          <div class="bmi-item">
+            <div class="bmi-val" id="bmi-ideal">—</div>
+            <div class="bmi-lbl">표준체중(kg)</div>
+          </div>
+        </div>
+        <div class="calorie-row">
+          <div class="calorie-label">🔥 오늘 달리기 예상 소모 칼로리</div>
+          <div class="calorie-programs" id="calorie-list"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="history-card">
       <div class="history-head">
         <h4>최근 기록</h4>
@@ -855,7 +909,7 @@ function showPage(id, btn) {
   document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   if (btn) btn.classList.add('active');
-  if (id === 'record') renderHistory();
+  if (id === 'record') { renderHistory(); loadBodyInfo(); }
 }
 
 // ── Program ───────────────────────────
@@ -1054,8 +1108,66 @@ function finishWorkout() {
 }
 
 // ── Record ────────────────────────────
+function calcBMI() {
+  const h = parseFloat(document.getElementById('input-height').value);
+  const w = parseFloat(document.getElementById('input-weight').value);
+  const result = document.getElementById('bmi-result');
+  if (!h || !w || h < 100 || w < 20) { result.style.display = 'none'; return; }
+
+  // BMI 계산
+  const hm = h / 100;
+  const bmi = (w / (hm * hm)).toFixed(1);
+
+  // 한국 기준 판정
+  let status, color;
+  if (bmi < 18.5)      { status = '저체중'; color = '#60a5fa'; }
+  else if (bmi < 23.0) { status = '정상';   color = '#34d399'; }
+  else if (bmi < 25.0) { status = '과체중'; color = '#fbbf24'; }
+  else if (bmi < 30.0) { status = '비만';   color = '#f87171'; }
+  else                  { status = '고도비만'; color = '#ef4444'; }
+
+  // 표준체중 (브로카 변법: 신장-100 × 0.9)
+  const ideal = ((h - 100) * 0.9).toFixed(1);
+
+  document.getElementById('bmi-val').textContent = bmi;
+  document.getElementById('bmi-val').style.color = color;
+  document.getElementById('bmi-status').textContent = status;
+  document.getElementById('bmi-status').style.color = color;
+  document.getElementById('bmi-ideal').textContent = ideal;
+  result.style.display = 'block';
+
+  // 칼로리 계산 (MET × 체중 × 시간h)
+  // 달리기 MET: 이지런8, 인터벌11, 파틀렉9, 템포10, 장거리8.5
+  const progInfo = [
+    { key:'easy',     name:'이지 런',   met:8.0,  mins:35 },
+    { key:'interval', name:'인터벌',    met:11.0, mins:22 },
+    { key:'fartlek',  name:'파틀렉',    met:9.0,  mins:27 },
+    { key:'tempo',    name:'템포 런',   met:10.0, mins:40 },
+    { key:'long',     name:'장거리 런', met:8.5,  mins:55 },
+  ];
+  const list = document.getElementById('calorie-list');
+  list.innerHTML = progInfo.map(p => {
+    const kcal = Math.round(p.met * w * (p.mins / 60));
+    return `<div class="calorie-item">
+      <span class="c-prog">${p.name} (${p.mins}분)</span>
+      <span class="c-kcal">${kcal} kcal</span>
+    </div>`;
+  }).join('');
+
+  // localStorage에 키/체중 저장
+  localStorage.setItem('run-body', JSON.stringify({height: h, weight: w}));
+}
+
+function loadBodyInfo() {
+  const saved = JSON.parse(localStorage.getItem('run-body') || 'null');
+  if (!saved) return;
+  document.getElementById('input-height').value = saved.height || '';
+  document.getElementById('input-weight').value = saved.weight || '';
+  calcBMI();
+}
 function renderHistory() {
   const hist = JSON.parse(localStorage.getItem('run-history')||'[]');
+  const body = JSON.parse(localStorage.getItem('run-body')||'null');
   document.getElementById('stat-count').textContent = hist.length;
   document.getElementById('stat-time').textContent = hist.reduce((a,h)=>a+h.duration,0);
   document.getElementById('stat-streak').textContent = calcStreak(hist);
@@ -1064,12 +1176,15 @@ function renderHistory() {
     list.innerHTML='<div class="empty-state">아직 운동 기록이 없습니다.<br>첫 번째 달리기를 시작해보세요! 🏃</div>';
     return;
   }
+  const MET = {'이지 런':8.0,'인터벌':11.0,'파틀렉':9.0,'템포 런':10.0,'장거리 런':8.5,'커스텀':9.0};
   list.innerHTML = hist.map(h=>{
     const d=new Date(h.date);
     const ds=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const met = MET[h.program] || 9.0;
+    const kcalStr = body ? ` · 🔥${Math.round(met * body.weight * (h.duration/60))}kcal` : '';
     return `<div class="history-item">
       <div class="h-dot"></div>
-      <div class="h-main"><div class="h-prog">${h.program}</div><div class="h-sub">${h.duration}분 · RPE ${h.rpe}</div></div>
+      <div class="h-main"><div class="h-prog">${h.program}</div><div class="h-sub">${h.duration}분 · RPE ${h.rpe}${kcalStr}</div></div>
       <div class="h-meta">${ds}</div>
     </div>`;
   }).join('');
