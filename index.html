@@ -286,6 +286,17 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
 .modal-save-btn{width:100%;padding:15px;background:var(--run);border:none;border-radius:14px;color:white;font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:.08em;cursor:pointer;}
 .modal-save-btn:disabled{background:rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:not-allowed;}
 
+/* 시작 전 시간 조절 시트 */
+.st-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07);}
+.st-lbl{font-size:.85rem;color:rgba(255,255,255,.85);font-weight:600;}
+.st-sub{font-size:.66rem;color:rgba(255,255,255,.35);margin-top:2px;}
+.st-fixed{font-family:'JetBrains Mono',monospace;font-size:.8rem;color:rgba(255,255,255,.4);}
+.st-ctl{display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.st-ctl button{width:36px;height:36px;border-radius:9px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.st-ctl button:active{background:rgba(255,255,255,.22);}
+.st-val{min-width:74px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.92rem;color:#fff;}
+.st-total{text-align:center;font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--run);margin:16px 0 14px;letter-spacing:.05em;}
+
 /* detail modal */
 .detail-map{width:100%;height:180px;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#1a2a3a;}
 .detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
@@ -344,6 +355,20 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
     <button class="modal-save-btn" onclick="resumeFromPause()">▶ 계속하기</button>
     <button class="detail-close" onclick="finishFromPause()">🏁 여기까지 기록하고 종료</button>
     <button class="del-btn" onclick="discardFromPause()">🗑 기록 없이 종료</button>
+  </div>
+</div>
+
+<!-- ══ 시작 전 시간 조절 모달 ══ -->
+<div class="modal-overlay" id="start-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="start-title">프로그램</div>
+    <div class="modal-sub">원하는 시간으로 조절한 뒤 시작하세요</div>
+    <div id="start-body"></div>
+    <div class="st-total" id="start-total">총 0분</div>
+    <button class="modal-save-btn" onclick="startFromSheet()">이 설정으로 시작</button>
+    <button class="detail-close" onclick="resetStartTune()">기본값으로 초기화</button>
+    <button class="detail-close" onclick="closeStartSheet()">취소</button>
   </div>
 </div>
 
@@ -608,12 +633,18 @@ const PROGS = {
       {t:'warm',l:'워밍업 걷기',d:180},{t:'warm',l:'느린 조깅',d:300},
       {t:'run', l:'이지 페이스',d:1200},
       {t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:120}
-    ]
+    ],
+    tune:{kind:'steady',
+      warm:[{t:'warm',l:'워밍업 걷기',d:180},{t:'warm',l:'느린 조깅',d:300}],
+      run:{l:'이지 페이스',d:1200,min:300,max:5400,step:60},
+      cool:[{t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:120}]}
   },
   interval: {
     name:'인터벌', em:'⚡', desc:'빠른 달리기 + 회복 조깅 반복. 심폐 향상.',
     tags:['고강도','35분','RPE 8~9'], met:11.0, rec:'8~9',
-    steps: makeIntervalSteps()
+    steps: makeIntervalSteps(),
+    tune:{kind:'interval', warm:300, sets:6, run:90, rest:60, cool:300,
+      setsMin:2, setsMax:15, runStep:15, restStep:15}
   },
   fartlek: {
     name:'파틀렉', em:'🌊', desc:'자유로운 속도 변화. 느낌대로 달리기.',
@@ -625,14 +656,27 @@ const PROGS = {
       {t:'run',l:'쉬운 조깅',d:180},{t:'run',l:'빠른 달리기',d:90},
       {t:'run',l:'쉬운 조깅',d:240},{t:'run',l:'스프린트',d:45},
       {t:'rest',l:'쿨다운',d:300}
-    ]
+    ],
+    tune:{kind:'scale', scale:1.0, min:0.5, max:2.0, step:0.25,
+      base:[
+        {t:'warm',l:'워밍업 조깅',d:300},
+        {t:'run',l:'쉬운 조깅',d:180},{t:'run',l:'빠른 달리기',d:60},
+        {t:'run',l:'중간 페이스',d:120},{t:'run',l:'스프린트',d:30},
+        {t:'run',l:'쉬운 조깅',d:180},{t:'run',l:'빠른 달리기',d:90},
+        {t:'run',l:'쉬운 조깅',d:240},{t:'run',l:'스프린트',d:45},
+        {t:'rest',l:'쿨다운',d:300}
+      ]}
   },
   tempo: {
     name:'템포 런', em:'🔥', desc:'젖산 역치 속도 지속. 레이스 페이스 적응.',
     tags:['고강도','45분','RPE 7~8'], met:10.0, rec:'7~8',
     steps:[
       {t:'warm',l:'워밍업',d:600},{t:'run',l:'템포 페이스',d:1200},{t:'rest',l:'쿨다운',d:600}
-    ]
+    ],
+    tune:{kind:'steady',
+      warm:[{t:'warm',l:'워밍업',d:600}],
+      run:{l:'템포 페이스',d:1200,min:300,max:5400,step:60},
+      cool:[{t:'rest',l:'쿨다운',d:600}]}
   },
   long: {
     name:'장거리 런', em:'🏔️', desc:'지구력 향상. 느리고 길게.',
@@ -640,7 +684,11 @@ const PROGS = {
     steps:[
       {t:'warm',l:'워밍업 걷기',d:300},{t:'run',l:'편안한 달리기',d:2400},
       {t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:180}
-    ]
+    ],
+    tune:{kind:'steady',
+      warm:[{t:'warm',l:'워밍업 걷기',d:300}],
+      run:{l:'편안한 달리기',d:2400,min:600,max:7200,step:120},
+      cool:[{t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:180}]}
   },
   custom: {
     name:'커스텀', em:'⚙️', desc:'시간과 세트를 직접 설정.',
@@ -673,6 +721,7 @@ let detailIdx = null;
 let detailMap = null;            // 기록 상세 지도 인스턴스 (재오픈 시 제거용)
 let lastTick = 0;                // 타임스탬프 기반 타이머용 (백그라운드 드리프트 방지)
 let selectedRPE = null;          // RPE 모달에서 선택된 강도(저장 전까지 보관)
+let startKey = null, startTune = null;   // 시작 전 시간 조절 시트 상태
 let mapRotate = localStorage.getItem('run-maprotate') !== '0'; // 기본: 진행방향 회전 ON
 
 // ════════════════════════════════════════
@@ -778,26 +827,125 @@ function renderStreakBars(barsId, daysId) {
 }
 
 function selectAndStart(key) {
-  curProg = key;
   if (key === 'custom') {
     // 잘못된 입력(빈값/문자/음수)에도 안전하도록 범위 보정
     const r = Math.min(3600, Math.max(5,  parseInt(prompt('달리기 시간(초):', '60'), 10) || 60));
     const w = Math.min(3600, Math.max(0,  parseInt(prompt('휴식 시간(초):', '30'), 10) || 30));
     const s = Math.min(30,   Math.max(1,  parseInt(prompt('세트 수:', '8'),    10) || 8));
-    PROGS.custom.steps = [{t:'warm',l:'워밍업',d:120}];
+    const cs = [{t:'warm',l:'워밍업',d:120}];
     for (let i = 0; i < s; i++) {
-      PROGS.custom.steps.push({t:'run',l:`달리기 ${i+1}`,d:r});
-      if (w > 0) PROGS.custom.steps.push({t:'rest',l:`휴식 ${i+1}`,d:w});
+      cs.push({t:'run',l:`달리기 ${i+1}`,d:r});
+      if (w > 0) cs.push({t:'rest',l:`휴식 ${i+1}`,d:w});
     }
-    PROGS.custom.steps.push({t:'rest',l:'쿨다운',d:120});
+    cs.push({t:'rest',l:'쿨다운',d:120});
+    PROGS.custom.steps = cs;
+    beginWorkout('custom', cs);
+    return;
   }
+  // 프리셋: 시작 전 시간 조절 시트 열기
+  startKey = key;
+  startTune = JSON.parse(JSON.stringify(PROGS[key].tune));  // 기본값 복제(원본 불변)
+  renderStartSheet();
+  document.getElementById('start-modal').classList.add('show');
+}
+
+// 조절된 steps로 실제 운동 시작 (공용)
+function beginWorkout(key, stepsArr) {
+  curProg = key;
   clearProgress();   // 새 운동 시작 → 이전 진행상태 폐기
-  steps = [...PROGS[key].steps];
+  steps = stepsArr;
   stepIdx = 0; elapsed = 0; gpsCoords = []; running = false;
   document.getElementById('t-progname').textContent = PROGS[key].name;
   loadStep(0);
   renderStepsList();
   nav('timer', document.querySelectorAll('.bnav-btn')[1]);
+}
+
+// ════════ 시작 전 시간 조절 시트 ════════
+function fmtDur(sec) {
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return s ? `${m}분 ${s}초` : `${m}분`;
+}
+function totalOf(arr) { return arr.reduce((a, s) => a + s.d, 0); }
+
+// 현재 startTune 으로 steps 생성
+function buildFromTune(t) {
+  if (t.kind === 'steady') {
+    return [...t.warm.map(s => ({...s})), {t:'run', l:t.run.l, d:t.run.d}, ...t.cool.map(s => ({...s}))];
+  }
+  if (t.kind === 'interval') {
+    const s = [{t:'warm', l:'워밍업', d:t.warm}];
+    for (let i = 0; i < t.sets; i++) {
+      s.push({t:'run', l:`인터벌 ${i+1}`, d:t.run});
+      if (t.rest > 0) s.push({t:'rest', l:`회복 ${i+1}`, d:t.rest});
+    }
+    s.push({t:'rest', l:'쿨다운', d:t.cool});
+    return s;
+  }
+  if (t.kind === 'scale') {
+    return t.base.map(s => s.t === 'run' ? {...s, d:Math.max(5, Math.round(s.d * t.scale))} : {...s});
+  }
+  return [];
+}
+
+function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function stepRow(label, sub, field, valText) {
+  return `<div class="st-row"><div><div class="st-lbl">${label}</div>${sub ? `<div class="st-sub">${sub}</div>` : ''}</div>`
+    + `<div class="st-ctl"><button onclick="tuneAdjust('${field}',-1)">−</button>`
+    + `<span class="st-val">${valText}</span>`
+    + `<button onclick="tuneAdjust('${field}',1)">+</button></div></div>`;
+}
+function fixedRow(label, sec) {
+  return `<div class="st-row"><div class="st-lbl">${label}</div><div class="st-fixed">${fmtDur(sec)} · 고정</div></div>`;
+}
+
+function renderStartSheet() {
+  const p = PROGS[startKey], t = startTune;
+  document.getElementById('start-title').textContent = `${p.em} ${p.name}`;
+  let rows = '';
+  if (t.kind === 'steady') {
+    t.warm.forEach(w => rows += fixedRow(w.l, w.d));
+    rows += stepRow('달리기 시간', null, 'run', fmtDur(t.run.d));
+    t.cool.forEach(c => rows += fixedRow(c.l, c.d));
+  } else if (t.kind === 'interval') {
+    rows += fixedRow('워밍업', t.warm);
+    rows += stepRow('세트 수', null, 'sets', `${t.sets}세트`);
+    rows += stepRow('달리기 (각 세트)', null, 'run', fmtDur(t.run));
+    rows += stepRow('회복 (각 세트)', null, 'rest', fmtDur(t.rest));
+    rows += fixedRow('쿨다운', t.cool);
+  } else if (t.kind === 'scale') {
+    const built = buildFromTune(t);
+    const runSec = built.filter(s => s.t === 'run').reduce((a, s) => a + s.d, 0);
+    rows += stepRow('달리기 길이', `배율 ×${t.scale.toFixed(2)} · 워밍업/쿨다운 고정`, 'scale', fmtDur(runSec));
+  }
+  document.getElementById('start-body').innerHTML = rows;
+  document.getElementById('start-total').textContent = `총 ${fmtDur(totalOf(buildFromTune(t)))}`;
+}
+
+function tuneAdjust(field, dir) {
+  const t = startTune;
+  if (t.kind === 'steady' && field === 'run') {
+    t.run.d = clamp(t.run.d + dir * t.run.step, t.run.min, t.run.max);
+  } else if (t.kind === 'interval') {
+    if (field === 'sets') t.sets = clamp(t.sets + dir, t.setsMin, t.setsMax);
+    if (field === 'run')  t.run  = clamp(t.run + dir * t.runStep, 15, 600);
+    if (field === 'rest') t.rest = clamp(t.rest + dir * t.restStep, 0, 300);
+  } else if (t.kind === 'scale' && field === 'scale') {
+    t.scale = clamp(+(t.scale + dir * t.step).toFixed(2), t.min, t.max);
+  }
+  renderStartSheet();
+}
+
+function resetStartTune() {
+  startTune = JSON.parse(JSON.stringify(PROGS[startKey].tune));
+  renderStartSheet();
+}
+function closeStartSheet() { document.getElementById('start-modal').classList.remove('show'); }
+function startFromSheet() {
+  const built = buildFromTune(startTune);
+  closeStartSheet();
+  beginWorkout(startKey, built);
 }
 
 // ════════════════════════════════════════
@@ -1504,6 +1652,10 @@ document.addEventListener('visibilitychange', () => {
 // 일시정지 시트 바깥 영역을 누르면 '계속하기'로 처리
 document.getElementById('pause-modal').addEventListener('click', e => {
   if (e.target.id === 'pause-modal') resumeFromPause();
+});
+// 시작 조절 시트 바깥 영역을 누르면 취소
+document.getElementById('start-modal').addEventListener('click', e => {
+  if (e.target.id === 'start-modal') closeStartSheet();
 });
 
 renderHome();
