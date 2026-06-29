@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AICE Basic 핵심카드</title>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --card-bg: #1a1a24;
+    --border: #2a2a3a;
+    --text: #e8e8f0;
+    --sub: #8888aa;
+    --c1: #6c63ff;  /* AI프로세스 */
+    --c2: #00c9a7;  /* 기술통계 */
+    --c3: #f7b731;  /* 시각화 */
+    --c4: #fc5c65;  /* 전처리 */
+    --c5: #45aaf2;  /* 모델링 */
+    --accent: #6c63ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, 'Noto Sans KR', sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+
+  /* ── 상단 헤더 ── */
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px 0;
+  }
+  .header h1 {
+    font-size: 14px; color: var(--sub); font-weight: 500;
+    letter-spacing: .05em; text-transform: uppercase; padding-bottom: 8px;
+  }
+  .tabs {
+    display: flex; gap: 6px; overflow-x: auto;
+    scrollbar-width: none; padding-bottom: 10px;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0;
+    padding: 5px 14px; border-radius: 20px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    border: 1.5px solid transparent; transition: all .2s;
+    background: var(--card-bg); color: var(--sub);
+  }
+  .tab.active { color: #fff; }
+  .tab[data-g="0"].active { border-color: var(--c1); background: #1e1a33; color: var(--c1); }
+  .tab[data-g="1"].active { border-color: var(--c2); background: #0d2520; color: var(--c2); }
+  .tab[data-g="2"].active { border-color: var(--c3); background: #272010; color: var(--c3); }
+  .tab[data-g="3"].active { border-color: var(--c4); background: #27111a; color: var(--c4); }
+  .tab[data-g="4"].active { border-color: var(--c5); background: #0f1e2e; color: var(--c5); }
+
+  /* ── 카드 컨테이너 ── */
+  .group { display: none; padding: 14px 14px 0; }
+  .group.visible { display: block; }
+
+  /* ── 카드 ── */
+  .card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .card-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-icon { font-size: 20px; line-height: 1; }
+  .card-title { font-size: 15px; font-weight: 700; }
+  .card-num {
+    margin-left: auto; font-size: 11px; color: var(--sub);
+    background: var(--border); padding: 2px 8px; border-radius: 10px;
+  }
+  .card-body { padding: 14px 16px; }
+
+  /* ── 색상 액센트 라인 ── */
+  .card[data-g="0"] .card-head { border-left: 3px solid var(--c1); }
+  .card[data-g="1"] .card-head { border-left: 3px solid var(--c2); }
+  .card[data-g="2"] .card-head { border-left: 3px solid var(--c3); }
+  .card[data-g="3"] .card-head { border-left: 3px solid var(--c4); }
+  .card[data-g="4"] .card-head { border-left: 3px solid var(--c5); }
+
+  /* ── 내부 요소 ── */
+  .kw { font-weight: 700; }
+  .kw.c1 { color: var(--c1); }
+  .kw.c2 { color: var(--c2); }
+  .kw.c3 { color: var(--c3); }
+  .kw.c4 { color: var(--c4); }
+  .kw.c5 { color: var(--c5); }
+
+  .row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .chip {
+    padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    background: var(--border);
+  }
+  .chip.c1 { background: #1e1a33; color: var(--c1); }
+  .chip.c2 { background: #0d2520; color: var(--c2); }
+  .chip.c3 { background: #272010; color: var(--c3); }
+  .chip.c4 { background: #27111a; color: var(--c4); }
+  .chip.c5 { background: #0f1e2e; color: var(--c5); }
+
+  .def-list { list-style: none; }
+  .def-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .def-list li:last-child { border-bottom: none; padding-bottom: 0; }
+  .def-term {
+    flex-shrink: 0; min-width: 90px; font-weight: 700; font-size: 13px;
+    color: var(--c2);
+  }
+  .def-desc { font-size: 13px; color: var(--text); }
+
+  .formula-box {
+    background: #12121c; border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; margin: 10px 0;
+    text-align: center; font-size: 14px; font-family: monospace;
+    letter-spacing: .03em;
+  }
+  .formula-box .big { font-size: 18px; font-weight: 700; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mini-card {
+    background: #12121c; border-radius: 10px;
+    padding: 10px; border: 1px solid var(--border);
+  }
+  .mini-card .title { font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+  .mini-card .value { font-size: 13px; font-weight: 600; }
+
+  .alert {
+    background: #1e1215; border: 1px solid #3a1520; border-radius: 10px;
+    padding: 10px 12px; margin-top: 10px; font-size: 13px; color: #fc8c95;
+  }
+  .tip {
+    background: #111e20; border: 1px solid #153020; border-radius: 10px;
+    padding: 10px 12px; margin-top: 10px; font-size: 13px; color: #5ce6c0;
+  }
+
+  .step-list { list-style: none; }
+  .step-list li {
+    display: flex; gap: 10px; padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .step-list li:last-child { border-bottom: none; }
+  .step-num {
+    flex-shrink: 0; width: 24px; height: 24px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .step-num.c5 { background: #1a2d40; color: var(--c5); }
+  .step-text { font-size: 13px; }
+  .step-text strong { display: block; font-size: 14px; margin-bottom: 2px; }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .compare-col { background: #12121c; border-radius: 10px; padding: 10px; border: 1px solid var(--border); }
+  .compare-head { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .compare-body { font-size: 12px; color: var(--sub); line-height: 1.6; }
+
+  p { margin-bottom: 8px; font-size: 13px; }
+  p:last-child { margin-bottom: 0; }
+
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .tag {
+    padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    background: var(--border); color: var(--sub);
+  }
+  .confusion {
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+    margin-top: 10px; font-size: 12px;
+  }
+  .confusion .ch { background: #1a1a28; padding: 6px 8px; text-align: center; font-weight: 700; }
+  .confusion table { width: 100%; border-collapse: collapse; }
+  .confusion td { padding: 6px 8px; text-align: center; border: 1px solid var(--border); font-size: 12px; }
+  .tp { color: #00c9a7; } .fp { color: #fc5c65; }
+  .fn { color: #f7b731; } .tn { color: #45aaf2; }
+
+  /* ── 하단 진행바 ── */
+  .progress-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg); border-top: 1px solid var(--border);
+    padding: 10px 16px 20px;
+  }
+  .progress-track {
+    height: 4px; background: var(--border); border-radius: 2px;
+    margin-bottom: 8px;
+  }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+  .progress-fill.c0 { background: var(--c1); }
+  .progress-fill.c1 { background: var(--c2); }
+  .progress-fill.c2 { background: var(--c3); }
+  .progress-fill.c3 { background: var(--c4); }
+  .progress-fill.c4 { background: var(--c5); }
+  .progress-label { font-size: 11px; color: var(--sub); text-align: center; }
+
+  /* ── 접기/펼치기 ── */
+  .collapsible { cursor: pointer; user-select: none; }
+  .collapsible::after { content: ' ▾'; font-size: 11px; color: var(--sub); }
+  .collapsible.open::after { content: ' ▴'; }
+  .collapse-content { display: none; }
+  .collapse-content.open { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📘 AICE Basic 핵심카드</h1>
+  <div class="tabs">
+    <div class="tab active" data-g="0" onclick="showGroup(0)">🤖 AI프로세스</div>
+    <div class="tab" data-g="1" onclick="showGroup(1)">📊 기술통계</div>
+    <div class="tab" data-g="2" onclick="showGroup(2)">📈 시각화</div>
+    <div class="tab" data-g="3" onclick="showGroup(3)">🔧 전처리</div>
+    <div class="tab" data-g="4" onclick="showGroup(4)">🧠 AI모델링</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     GROUP 0: AI 구현 프로세스
+════════════════════════════════════════════ -->
+<div class="group visible" id="g0">
+
+  <!-- 카드 0-1: AI 구현 전체 흐름 -->
+  <div class="card" data-g="0">
+    <div class="card-head">
+      <span class="card-icon">🗺️</span>
+      <span class="card-title">AI 구현 프로세스 전체 흐름</span>
+      <span class="card-num">1/3</span>
+    </div>
+    <div class="card-body">
+      <ul class="step-list">
+        <li>
+          <div class="step-num c5" style="background:#1a1a33;color:var(--c1)">1</div>
+          <div class="step-text"><strong>문제 정의</strong>해결할 비즈니스 문제를 AI 문제로 변환</div>
+        </li>
+        <li>
+          <div class="step-num c5" style="background:#1a1a33;color:var(--c1)">2</div>
+          <div class="step-text"><strong>데이터 수집</strong>목적에 맞는 데이터 확보</div>
+        </li>
+        <li>
+          <div class="step-num c5" style="background:#1a1a33;color:var(--c1)">3</div>
+          <div class="step-text"><strong>데이터 분석 (EDA)</strong>기술통계 + 시각화로 데이터 탐색</div>
+        </li>
+        <li>
+          <div class="step-num c5" style="background:#1a1a33;color:var(--c1)">4</div>
+          <div class="step-text"><strong>데이터 전처리</strong>결측치 · 이상치 처리, 인코딩, 스케일링</div>
+        </li>
+        <li>
+          <div class="step-num c5" style="background:#1a1a33;color:var(--c1)">5</div>
+          <div class="step-text"><strong>AI 모델링</strong>알고리즘 선택 → 학습 → 평가 → 시뮬레이션</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 카드 0-2: 문제 유형 -->
+  <div class="card" data-g="0">
+    <div class="card-head">
+      <span class="card-icon">🎯</span>
+      <span class="card-title">AI 문제 유형 2가지</span>
+      <span class="card-num">2/3</span>
+    </div>
+    <div class="card-body">
+      <div class="compare">
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c2)">📂 분류 (Classification)</div>
+          <div class="compare-body">
+            정답이 <strong>카테고리</strong><br>
+            예) 스팸 여부<br>
+            질병 진단 (양성/음성)<br><br>
+            알고리즘: 의사결정나무, 로지스틱 회귀, 랜덤포레스트
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c3)">📉 회귀 (Regression)</div>
+          <div class="compare-body">
+            정답이 <strong>연속 숫자</strong><br>
+            예) 집값 예측<br>
+            매출액 예측<br><br>
+            알고리즘: 선형 회귀, 랜덤포레스트, 딥러닝 회귀
+          </div>
+        </div>
+      </div>
+      <div class="tip">💡 문제 유형에 따라 알고리즘과 평가지표가 달라진다!</div>
+    </div>
+  </div>
+
+  <!-- 카드 0-3: 입력/출력 -->
+  <div class="card" data-g="0">
+    <div class="card-head">
+      <span class="card-icon">⚙️</span>
+      <span class="card-title">모델의 핵심 구조</span>
+      <span class="card-num">3/3</span>
+    </div>
+    <div class="card-body">
+      <div class="formula-box">
+        <span style="color:var(--c2)">X (입력·독립변수·Feature)</span><br>
+        ↓<br>
+        <span style="color:var(--c1)">f(모델) = 수학적 함수</span><br>
+        ↓<br>
+        <span style="color:var(--c3)">y (출력·종속변수·Target)</span>
+      </div>
+      <ul class="def-list">
+        <li>
+          <span class="def-term" style="color:var(--c2)">입력값 X</span>
+          <span class="def-desc">독립변수 / Feature — 모델 학습에 사용되는 변수</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c3)">출력값 y</span>
+          <span class="def-desc">종속변수 / Target — 예측하려는 값</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c1)">모델 f</span>
+          <span class="def-desc">y = f(X) 를 만족하는 함수를 찾는 것이 모델링의 목표</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+</div><!-- /g0 -->
+
+<!-- ══════════════════════════════════════════
+     GROUP 1: 기술 통계
+════════════════════════════════════════════ -->
+<div class="group" id="g1">
+
+  <!-- 카드 1-1: 중심경향 -->
+  <div class="card" data-g="1">
+    <div class="card-head">
+      <span class="card-icon">🎯</span>
+      <span class="card-title">중심경향 — 평균 / 중앙값 / 최빈값</span>
+      <span class="card-num">1/5</span>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--sub);font-size:12px">예시 데이터: <strong style="color:#fff">1, 1, 1, 1, 2, 3, 3, 5, 10</strong></p>
+      <ul class="def-list">
+        <li>
+          <span class="def-term">평균 Mean</span>
+          <span class="def-desc">모든 값의 합 ÷ 개수<br><strong style="color:var(--c2)">(1+1+1+1+2+3+3+5+10) ÷ 9 = 3</strong></span>
+        </li>
+        <li>
+          <span class="def-term">중앙값 Median</span>
+          <span class="def-desc">오름차순 정렬 후 정중앙 값<br><strong style="color:var(--c2)">→ 2</strong></span>
+        </li>
+        <li>
+          <span class="def-term">최빈값 Mode</span>
+          <span class="def-desc">가장 자주 등장하는 값<br><strong style="color:var(--c2)">→ 1 (4번 등장)</strong></span>
+        </li>
+      </ul>
+      <div class="tip">💡 이상치가 있으면 평균은 왜곡됨 → 중앙값이 더 대표적</div>
+    </div>
+  </div>
+
+  <!-- 카드 1-2: 분산/표준편차 -->
+  <div class="card" data-g="1">
+    <div class="card-head">
+      <span class="card-icon">📐</span>
+      <span class="card-title">분산 & 표준편차 — 데이터의 퍼짐</span>
+      <span class="card-num">2/5</span>
+    </div>
+    <div class="card-body">
+      <ul class="def-list">
+        <li>
+          <span class="def-term">분산 Variance</span>
+          <span class="def-desc">각 값과 평균의 차이를 <strong>제곱하여 평균</strong><br>값이 클수록 데이터가 넓게 퍼짐<br><strong style="color:var(--c2)">예: 7.78</strong></span>
+        </li>
+        <li>
+          <span class="def-term">표준편차 Std Dev</span>
+          <span class="def-desc">분산의 <strong>제곱근</strong> → 원래 단위로 해석 가능<br><strong style="color:var(--c2)">√7.78 = 2.79</strong></span>
+        </li>
+      </ul>
+      <div class="formula-box">
+        분산 = Σ(xᵢ - 평균)² ÷ n<br>
+        표준편차 = √분산
+      </div>
+      <div class="tip">💡 표준편차가 클수록 데이터 변동 폭이 크다</div>
+    </div>
+  </div>
+
+  <!-- 카드 1-3: 분포 지표 -->
+  <div class="card" data-g="1">
+    <div class="card-head">
+      <span class="card-icon">📦</span>
+      <span class="card-title">분포 지표 — 최솟값 / 최댓값 / 사분위수</span>
+      <span class="card-num">3/5</span>
+    </div>
+    <div class="card-body">
+      <ul class="def-list">
+        <li>
+          <span class="def-term">최솟값 Min</span>
+          <span class="def-desc">데이터에서 가장 작은 값</span>
+        </li>
+        <li>
+          <span class="def-term">최댓값 Max</span>
+          <span class="def-desc">데이터에서 가장 큰 값</span>
+        </li>
+        <li>
+          <span class="def-term">Q1 (25%)</span>
+          <span class="def-desc">전체 데이터 중 하위 25% 지점</span>
+        </li>
+        <li>
+          <span class="def-term">Q2 (50%)</span>
+          <span class="def-desc">= 중앙값 (Median)</span>
+        </li>
+        <li>
+          <span class="def-term">Q3 (75%)</span>
+          <span class="def-desc">전체 데이터 중 하위 75% 지점</span>
+        </li>
+        <li>
+          <span class="def-term">IQR</span>
+          <span class="def-desc"><strong style="color:var(--c2)">Q3 - Q1</strong> (중간 50% 범위, 이상치 탐지에 사용)</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 카드 1-4: 왜도 -->
+  <div class="card" data-g="1">
+    <div class="card-head">
+      <span class="card-icon">〰️</span>
+      <span class="card-title">왜도 (Skewness) — 분포의 비대칭</span>
+      <span class="card-num">4/5</span>
+    </div>
+    <div class="card-body">
+      <div class="grid2">
+        <div class="mini-card">
+          <div class="title">왜도 &gt; 0 (양수)</div>
+          <div class="value" style="color:var(--c3)">오른쪽 꼬리 ▶<br>왼쪽에 집중</div>
+        </div>
+        <div class="mini-card">
+          <div class="title">왜도 &lt; 0 (음수)</div>
+          <div class="value" style="color:var(--c5)">◀ 왼쪽 꼬리<br>오른쪽에 집중</div>
+        </div>
+      </div>
+      <div class="mini-card" style="margin-top:8px;text-align:center">
+        <div class="title">왜도 = 0</div>
+        <div class="value" style="color:var(--c2)">정규분포 (좌우대칭)</div>
+      </div>
+      <div class="tip">💡 왜도>0 이면 평균이 중앙값보다 크다 (극단값이 오른쪽에 있어 평균을 끌어올림)</div>
+    </div>
+  </div>
+
+  <!-- 카드 1-5: 상관계수 -->
+  <div class="card" data-g="1">
+    <div class="card-head">
+      <span class="card-icon">🔗</span>
+      <span class="card-title">상관계수 (Correlation Coefficient)</span>
+      <span class="card-num">5/5</span>
+    </div>
+    <div class="card-body">
+      <p>두 변수 간 관계를 수치화. 범위: <strong style="color:var(--c2)">-1 ~ +1</strong></p>
+      <ul class="def-list">
+        <li>
+          <span class="def-term" style="color:var(--c2)">+1에 가까움</span>
+          <span class="def-desc"><strong>강한 양의 상관</strong> — 한 변수↑ 다른 변수↑</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c4)">-1에 가까움</span>
+          <span class="def-desc"><strong>강한 음의 상관</strong> — 한 변수↑ 다른 변수↓</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--sub)">0에 가까움</span>
+          <span class="def-desc">상관관계 거의 없음</span>
+        </li>
+      </ul>
+      <div class="tag-row">
+        <span class="tag" style="background:#0d2520;color:var(--c2)">양의 상관 ↗</span>
+        <span class="tag" style="background:#27111a;color:var(--c4)">음의 상관 ↘</span>
+        <span class="tag">무상관 —</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /g1 -->
+
+<!-- ══════════════════════════════════════════
+     GROUP 2: 데이터 시각화
+════════════════════════════════════════════ -->
+<div class="group" id="g2">
+
+  <!-- 카드 2-1: 그래프 개요 -->
+  <div class="card" data-g="2">
+    <div class="card-head">
+      <span class="card-icon">📊</span>
+      <span class="card-title">주요 그래프 5종 한눈에</span>
+      <span class="card-num">1/3</span>
+    </div>
+    <div class="card-body">
+      <ul class="def-list">
+        <li>
+          <span class="def-term" style="color:var(--c3)">카운트플롯</span>
+          <span class="def-desc">범주형 데이터 빈도 막대 → 분포 파악</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c3)">히스토그램</span>
+          <span class="def-desc">수치형 데이터 구간별 빈도 → 분포 형태 파악</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c3)">박스플롯</span>
+          <span class="def-desc">Q1/Q2/Q3/Min/Max + 이상치 → 분포+이상치 한번에</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c3)">산점도</span>
+          <span class="def-desc">두 변수 관계를 점으로 → 상관관계·패턴·이상치</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c3)">히트맵</span>
+          <span class="def-desc">변수 간 상관계수를 색상으로 → 관계 한눈에</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 카드 2-2: 단일변수 -->
+  <div class="card" data-g="2">
+    <div class="card-head">
+      <span class="card-icon">1️⃣</span>
+      <span class="card-title">단일 변수 시각화</span>
+      <span class="card-num">2/3</span>
+    </div>
+    <div class="card-body">
+      <div class="compare">
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c3)">카운트플롯</div>
+          <div class="compare-body">
+            ✅ 범주형 (Category)<br>
+            예) 성별, 등급<br>
+            빈도(횟수)를 막대 높이로 표현
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c3)">히스토그램</div>
+          <div class="compare-body">
+            ✅ 수치형 (Numeric)<br>
+            예) 나이, 가격<br>
+            구간(Bin)별 데이터 수 표현
+          </div>
+        </div>
+      </div>
+      <div class="tip" style="margin-top:10px">💡 박스플롯도 단일 변수 → Q1/Q2/Q3 + 이상치까지 표현</div>
+    </div>
+  </div>
+
+  <!-- 카드 2-3: 다변수 -->
+  <div class="card" data-g="2">
+    <div class="card-head">
+      <span class="card-icon">2️⃣</span>
+      <span class="card-title">여러 변수 관계 시각화</span>
+      <span class="card-num">3/3</span>
+    </div>
+    <div class="card-body">
+      <div class="compare">
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c3)">산점도 (Scatter)</div>
+          <div class="compare-body">
+            두 변수를 x, y 축<br>
+            점으로 관계 표현<br>
+            → 상관관계 / 패턴 / 이상치 탐색
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c3)">히트맵 (Heatmap)</div>
+          <div class="compare-body">
+            상관계수를 색으로<br>
+            빨강↔파랑으로 강도 표현<br>
+            → 변수 간 관계 전체 파악
+          </div>
+        </div>
+      </div>
+      <div class="alert" style="margin-top:10px">⚠️ 그래프 선택 기준: 범주형→카운트플롯, 수치형→히스토그램, 두 변수→산점도</div>
+    </div>
+  </div>
+
+</div><!-- /g2 -->
+
+<!-- ══════════════════════════════════════════
+     GROUP 3: 데이터 전처리
+════════════════════════════════════════════ -->
+<div class="group" id="g3">
+
+  <!-- 카드 3-1: 전처리 개요 -->
+  <div class="card" data-g="3">
+    <div class="card-head">
+      <span class="card-icon">🔧</span>
+      <span class="card-title">데이터 전처리 4단계</span>
+      <span class="card-num">1/5</span>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--sub);font-size:12px">컴퓨터가 데이터를 더 잘 이해할 수 있는 형태로 변환하는 과정</p>
+      <ul class="step-list">
+        <li>
+          <div class="step-num" style="background:#27111a;color:var(--c4)">1</div>
+          <div class="step-text"><strong>결측치 처리</strong>누락된 데이터 처리</div>
+        </li>
+        <li>
+          <div class="step-num" style="background:#27111a;color:var(--c4)">2</div>
+          <div class="step-text"><strong>이상치 처리</strong>극단적으로 벗어난 값 처리</div>
+        </li>
+        <li>
+          <div class="step-num" style="background:#27111a;color:var(--c4)">3</div>
+          <div class="step-text"><strong>인코딩 (Encoding)</strong>문자 → 숫자로 변환</div>
+        </li>
+        <li>
+          <div class="step-num" style="background:#27111a;color:var(--c4)">4</div>
+          <div class="step-text"><strong>스케일링 (Scaling)</strong>숫자 범위 통일</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 카드 3-2: 결측치 -->
+  <div class="card" data-g="3">
+    <div class="card-head">
+      <span class="card-icon">❓</span>
+      <span class="card-title">결측치 처리 (Missing Value)</span>
+      <span class="card-num">2/5</span>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--sub);font-size:12px">데이터가 누락되어 비어있는 상태 (NaN)</p>
+      <ul class="def-list">
+        <li>
+          <span class="def-term" style="color:var(--c4)">① 열 제거</span>
+          <span class="def-desc">결측치가 너무 많아 의미 없는 <strong>변수(컬럼) 삭제</strong></span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c4)">② 행 제거</span>
+          <span class="def-desc">결측치를 포함한 <strong>데이터 행 삭제</strong></span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c4)">③ 대체</span>
+          <span class="def-desc">평균 / 중앙값 / 최빈값 / 상수 등으로 <strong>채우기</strong><br>
+          수치형→평균/중앙값, 범주형→최빈값</span>
+        </li>
+      </ul>
+      <div class="alert">⚠️ 결측치 많으면 모델 예측 결과가 왜곡될 수 있음</div>
+    </div>
+  </div>
+
+  <!-- 카드 3-3: 이상치 -->
+  <div class="card" data-g="3">
+    <div class="card-head">
+      <span class="card-icon">⚡</span>
+      <span class="card-title">이상치 처리 (Outlier) — IQR 기법</span>
+      <span class="card-num">3/5</span>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--sub);font-size:12px">일반적인 분포에서 크게 벗어난 값</p>
+      <div class="formula-box">
+        IQR = Q3 - Q1<br>
+        상단 경계 = <span style="color:var(--c4)">Q3 + 1.5 × IQR</span><br>
+        하단 경계 = <span style="color:var(--c4)">Q1 - 1.5 × IQR</span>
+      </div>
+      <p style="margin-top:8px;font-size:13px">경계 밖의 값 = <strong style="color:var(--c4)">이상치</strong></p>
+      <ul class="def-list">
+        <li>
+          <span class="def-term" style="color:var(--c4)">① 제거</span>
+          <span class="def-desc">이상치가 있는 행 삭제 (분석에 방해될 때)</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c4)">② 대체</span>
+          <span class="def-desc">상단/하단 경계값 또는 특정 상수로 변환</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 카드 3-4: 인코딩 -->
+  <div class="card" data-g="3">
+    <div class="card-head">
+      <span class="card-icon">🔢</span>
+      <span class="card-title">인코딩 (Encoding) — 문자→숫자</span>
+      <span class="card-num">4/5</span>
+    </div>
+    <div class="card-body">
+      <div class="compare">
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c4)">레이블 인코딩</div>
+          <div class="compare-body">
+            범주를 정수로 변환<br>
+            서울→2, 대전→0, 부산→1<br><br>
+            ⚠️ 문제: 컴퓨터가 2>0이라고 크기 순서로 오해 가능
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c2)">원-핫 인코딩</div>
+          <div class="compare-body">
+            범주마다 0/1 컬럼 생성<br>
+            서울→[1,0,0]<br>대전→[0,1,0]<br>부산→[0,0,1]<br><br>
+            ⚠️ 범주 많으면 차원이 폭발적으로 증가
+          </div>
+        </div>
+      </div>
+      <div class="tip">💡 순서 없는 범주형 → 원-핫 / 순서 있는 범주형 → 레이블</div>
+    </div>
+  </div>
+
+  <!-- 카드 3-5: 스케일링 -->
+  <div class="card" data-g="3">
+    <div class="card-head">
+      <span class="card-icon">⚖️</span>
+      <span class="card-title">스케일링 (Scaling) — 숫자 범위 통일</span>
+      <span class="card-num">5/5</span>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--sub);font-size:12px">변수 간 크기 차이로 인한 불공평한 학습 방지</p>
+      <div class="compare">
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c4)">Min-Max 정규화</div>
+          <div class="compare-body">
+            범위를 <strong>0~1</strong>로 변환<br>
+            x' = (x - min) / (max - min)<br><br>
+            ✅ 분포 보존<br>
+            ⚠️ 이상치에 민감
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c5)">표준화 (Standard)</div>
+          <div class="compare-body">
+            평균=0, 표준편차=1로 변환<br>
+            x' = (x - μ) / σ<br><br>
+            ✅ 이상치에 덜 민감<br>
+            ✅ 대부분 ML에 적합
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /g3 -->
+
+<!-- ══════════════════════════════════════════
+     GROUP 4: AI 모델링
+════════════════════════════════════════════ -->
+<div class="group" id="g4">
+
+  <!-- 카드 4-1: 모델링 5단계 -->
+  <div class="card" data-g="4">
+    <div class="card-head">
+      <span class="card-icon">🧠</span>
+      <span class="card-title">AI 모델링 5단계</span>
+      <span class="card-num">1/5</span>
+    </div>
+    <div class="card-body">
+      <ul class="step-list">
+        <li>
+          <div class="step-num c5">1</div>
+          <div class="step-text"><strong>데이터 준비</strong>입력(X) / 출력(y) 구분 → Train/Validation/Test 분할</div>
+        </li>
+        <li>
+          <div class="step-num c5">2</div>
+          <div class="step-text"><strong>알고리즘 선택</strong>문제 유형에 따라 분류/회귀 알고리즘 선택</div>
+        </li>
+        <li>
+          <div class="step-num c5">3</div>
+          <div class="step-text"><strong>모델 학습 (Training)</strong>Train Set으로 가중치(파라미터) 최적화</div>
+        </li>
+        <li>
+          <div class="step-num c5">4</div>
+          <div class="step-text"><strong>모델 평가 (Evaluation)</strong>Validation/Test Set으로 성능 검증</div>
+        </li>
+        <li>
+          <div class="step-num c5">5</div>
+          <div class="step-text"><strong>시뮬레이션</strong>새 데이터에 모델 적용, 변수 영향도 분석</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 카드 4-2: 데이터 분할 -->
+  <div class="card" data-g="4">
+    <div class="card-head">
+      <span class="card-icon">✂️</span>
+      <span class="card-title">데이터 분할 & 과적합/과소적합</span>
+      <span class="card-num">2/5</span>
+    </div>
+    <div class="card-body">
+      <div class="formula-box" style="text-align:left;font-family:inherit">
+        <span style="color:var(--c2)">■■■■■■■ Train Set</span> — 모델 학습용<br>
+        <span style="color:var(--c3)">■■ Validation Set</span> — 학습 중 검증<br>
+        <span style="color:var(--c4)">■ Test Set</span> — 최종 평가
+      </div>
+      <ul class="def-list" style="margin-top:8px">
+        <li>
+          <span class="def-term" style="color:var(--c4)">과적합 Overfitting</span>
+          <span class="def-desc">훈련 데이터에만 너무 최적화 → 새 데이터에서 성능 급락</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c3)">과소적합 Underfitting</span>
+          <span class="def-desc">훈련 데이터도 제대로 학습 못한 상태</span>
+        </li>
+      </ul>
+      <div class="tip">💡 Train/Test는 반드시 겹치지 않게 분리!</div>
+    </div>
+  </div>
+
+  <!-- 카드 4-3: 분류 평가지표 -->
+  <div class="card" data-g="4">
+    <div class="card-head">
+      <span class="card-icon">📂</span>
+      <span class="card-title">분류 모델 평가지표</span>
+      <span class="card-num">3/5</span>
+    </div>
+    <div class="card-body">
+      <div class="confusion">
+        <div class="ch">혼동행렬 (Confusion Matrix)</div>
+        <table>
+          <tr>
+            <td></td><td><strong>실제 Positive</strong></td><td><strong>실제 Negative</strong></td>
+          </tr>
+          <tr>
+            <td><strong>예측 P</strong></td>
+            <td class="tp">TP (맞음)</td>
+            <td class="fp">FP (틀림)</td>
+          </tr>
+          <tr>
+            <td><strong>예측 N</strong></td>
+            <td class="fn">FN (틀림)</td>
+            <td class="tn">TN (맞음)</td>
+          </tr>
+        </table>
+      </div>
+      <ul class="def-list" style="margin-top:10px">
+        <li>
+          <span class="def-term" style="color:var(--c5)">Accuracy</span>
+          <span class="def-desc"><strong>정확도</strong> = (TP+TN) / 전체 — 클수록 좋음</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c5)">Recall</span>
+          <span class="def-desc"><strong>재현율</strong> = TP / (TP+FN)<br>실제 P 중 P로 맞춘 비율 — 클수록 좋음</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c5)">Precision</span>
+          <span class="def-desc"><strong>정밀도</strong> = TP / (TP+FP)<br>P로 예측한 것 중 실제 P 비율 — 클수록 좋음</span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c5)">F1-Score</span>
+          <span class="def-desc"><strong>Recall + Precision 조화평균</strong><br>= 2 × (P×R) / (P+R) — 클수록 좋음</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 카드 4-4: 회귀 평가지표 -->
+  <div class="card" data-g="4">
+    <div class="card-head">
+      <span class="card-icon">📉</span>
+      <span class="card-title">회귀 모델 평가지표</span>
+      <span class="card-num">4/5</span>
+    </div>
+    <div class="card-body">
+      <ul class="def-list">
+        <li>
+          <span class="def-term" style="color:var(--c5)">MAE</span>
+          <span class="def-desc"><strong>평균 절대 오차</strong><br>실제값 - 예측값 절댓값의 평균<br><span style="color:var(--c2)">작을수록 좋음</span></span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c5)">MSE</span>
+          <span class="def-desc"><strong>평균 제곱 오차</strong><br>오차를 제곱하여 평균 → 큰 오차에 더 민감<br><span style="color:var(--c2)">작을수록 좋음</span></span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c5)">RMSE</span>
+          <span class="def-desc"><strong>√MSE</strong> — 오차를 원래 단위로 해석<br><span style="color:var(--c2)">작을수록 좋음</span></span>
+        </li>
+        <li>
+          <span class="def-term" style="color:var(--c5)">R² Score</span>
+          <span class="def-desc"><strong>결정계수 / 설명력</strong><br>모델이 데이터를 얼마나 잘 설명하는가<br><span style="color:var(--c2)">1에 가까울수록 좋음</span></span>
+        </li>
+      </ul>
+      <div class="alert">⚠️ 분류지표(Accuracy)는 클수록 좋고, 회귀지표(MAE/MSE/RMSE)는 작을수록 좋다! 혼동 주의</div>
+    </div>
+  </div>
+
+  <!-- 카드 4-5: 알고리즘 선택 요약 -->
+  <div class="card" data-g="4">
+    <div class="card-head">
+      <span class="card-icon">🗂️</span>
+      <span class="card-title">알고리즘 선택 가이드</span>
+      <span class="card-num">5/5</span>
+    </div>
+    <div class="card-body">
+      <div class="compare">
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c2)">분류 알고리즘</div>
+          <div class="compare-body">
+            • 의사결정나무<br>
+            &nbsp;&nbsp;(Decision Tree)<br>
+            • 로지스틱 회귀<br>
+            &nbsp;&nbsp;(Logistic Reg.)<br>
+            • 랜덤 포레스트<br>
+            • 딥러닝 분류
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head" style="color:var(--c3)">회귀 알고리즘</div>
+          <div class="compare-body">
+            • 선형 회귀<br>
+            &nbsp;&nbsp;(Linear Reg.)<br>
+            • 랜덤 포레스트<br>
+            &nbsp;&nbsp;(회귀 모드)<br>
+            • 딥러닝 회귀
+          </div>
+        </div>
+      </div>
+      <div class="tip">💡 랜덤 포레스트는 분류/회귀 모두 사용 가능!</div>
+      <div style="margin-top:10px;font-size:13px;color:var(--sub)">
+        <strong style="color:var(--text)">시뮬레이션 단계에서 확인:</strong><br>
+        • 변수 영향도(Feature Importance)<br>
+        • 어떤 변수가 예측에 가장 큰 영향?
+      </div>
+    </div>
+  </div>
+
+</div><!-- /g4 -->
+
+<!-- ── 하단 진행바 ── -->
+<div class="progress-bar">
+  <div class="progress-track">
+    <div class="progress-fill" id="pFill"></div>
+  </div>
+  <div class="progress-label" id="pLabel"></div>
+</div>
+
+<script>
+  const groups = [
+    { id: 'g0', label: 'AI프로세스', count: 3 },
+    { id: 'g1', label: '기술통계', count: 5 },
+    { id: 'g2', label: '시각화', count: 3 },
+    { id: 'g3', label: '전처리', count: 5 },
+    { id: 'g4', label: 'AI모델링', count: 5 },
+  ];
+  let current = 0;
+
+  function showGroup(idx) {
+    current = idx;
+    groups.forEach((g, i) => {
+      document.getElementById(g.id).classList.toggle('visible', i === idx);
+      document.querySelectorAll('.tab')[i].classList.toggle('active', i === idx);
+    });
+    updateProgress();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function updateProgress() {
+    const g = groups[current];
+    const total = groups.reduce((s, x) => s + x.count, 0);
+    const done = groups.slice(0, current).reduce((s, x) => s + x.count, 0) + g.count;
+    const pct = Math.round(done / total * 100);
+    document.getElementById('pFill').className = 'progress-fill c' + current;
+    document.getElementById('pFill').style.width = pct + '%';
+    document.getElementById('pLabel').textContent =
+      `${g.label} · ${g.count}장 | 전체 ${done}/${total}장 (${pct}%)`;
+  }
+
+  updateProgress();
+</script>
+</body>
+</html>
