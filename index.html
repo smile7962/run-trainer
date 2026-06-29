@@ -267,6 +267,7 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
 .rpe-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px;}
 .rpe-mbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:9px 3px 7px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transition:all .15s;}
 .rpe-mbtn:active{transform:scale(.92);}
+.rpe-mbtn.sel{border-color:var(--c,#fff);background:rgba(255,255,255,.14);box-shadow:0 0 0 2px var(--c,#fff) inset;}
 .rpe-num{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;line-height:1;}
 .rpe-hint{font-size:.57rem;font-weight:600;text-align:center;line-height:1.2;}
 .rpe-breath{font-size:.5rem;color:rgba(255,255,255,.35);text-align:center;line-height:1.2;}
@@ -283,6 +284,7 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
 .memo-input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px;color:white;font-size:.85rem;resize:none;height:60px;margin-bottom:16px;}
 .memo-input:focus{outline:none;border-color:var(--run);}
 .modal-save-btn{width:100%;padding:15px;background:var(--run);border:none;border-radius:14px;color:white;font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:.08em;cursor:pointer;}
+.modal-save-btn:disabled{background:rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:not-allowed;}
 
 /* detail modal */
 .detail-map{width:100%;height:180px;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#1a2a3a;}
@@ -305,16 +307,16 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
     <div class="modal-title">오늘 운동은 얼마나 힘들었나요?</div>
     <div class="modal-sub">운동 직후 느낌을 솔직하게 선택하세요</div>
     <div class="rpe-grid">
-      <button class="rpe-mbtn r12" onclick="submitRPE(1)"><span class="rpe-num">1</span><span class="rpe-hint">😴 매우 쉬움</span><span class="rpe-breath">노래 가능</span></button>
-      <button class="rpe-mbtn r12" onclick="submitRPE(2)"><span class="rpe-num">2</span><span class="rpe-hint">🙂 쉬움</span><span class="rpe-breath">긴 대화 가능</span></button>
-      <button class="rpe-mbtn r34" onclick="submitRPE(3)"><span class="rpe-num">3</span><span class="rpe-hint">😊 가벼움</span><span class="rpe-breath">대화 편함</span></button>
-      <button class="rpe-mbtn r34" onclick="submitRPE(4)"><span class="rpe-num">4</span><span class="rpe-hint">🚶 약간힘듦</span><span class="rpe-breath">짧은 대화</span></button>
-      <button class="rpe-mbtn r56" onclick="submitRPE(5)"><span class="rpe-num">5</span><span class="rpe-hint">🏃 중간</span><span class="rpe-breath">단어만</span></button>
-      <button class="rpe-mbtn r56" onclick="submitRPE(6)"><span class="rpe-num">6</span><span class="rpe-hint">💨 벅참</span><span class="rpe-breath">한두 단어</span></button>
-      <button class="rpe-mbtn r78" onclick="submitRPE(7)"><span class="rpe-num">7</span><span class="rpe-hint">😤 힘듦</span><span class="rpe-breath">말하기 어려움</span></button>
-      <button class="rpe-mbtn r78" onclick="submitRPE(8)"><span class="rpe-num">8</span><span class="rpe-hint">🥵 매우힘듦</span><span class="rpe-breath">거의 못함</span></button>
-      <button class="rpe-mbtn r910" onclick="submitRPE(9)"><span class="rpe-num">9</span><span class="rpe-hint">😵 극한</span><span class="rpe-breath">말 불가</span></button>
-      <button class="rpe-mbtn r910" onclick="submitRPE(10)"><span class="rpe-num">10</span><span class="rpe-hint">💀 최대</span><span class="rpe-breath">전력 질주</span></button>
+      <button class="rpe-mbtn r12" onclick="selectRPE(1,this)"><span class="rpe-num">1</span><span class="rpe-hint">😴 매우 쉬움</span><span class="rpe-breath">노래 가능</span></button>
+      <button class="rpe-mbtn r12" onclick="selectRPE(2,this)"><span class="rpe-num">2</span><span class="rpe-hint">🙂 쉬움</span><span class="rpe-breath">긴 대화 가능</span></button>
+      <button class="rpe-mbtn r34" onclick="selectRPE(3,this)"><span class="rpe-num">3</span><span class="rpe-hint">😊 가벼움</span><span class="rpe-breath">대화 편함</span></button>
+      <button class="rpe-mbtn r34" onclick="selectRPE(4,this)"><span class="rpe-num">4</span><span class="rpe-hint">🚶 약간힘듦</span><span class="rpe-breath">짧은 대화</span></button>
+      <button class="rpe-mbtn r56" onclick="selectRPE(5,this)"><span class="rpe-num">5</span><span class="rpe-hint">🏃 중간</span><span class="rpe-breath">단어만</span></button>
+      <button class="rpe-mbtn r56" onclick="selectRPE(6,this)"><span class="rpe-num">6</span><span class="rpe-hint">💨 벅참</span><span class="rpe-breath">한두 단어</span></button>
+      <button class="rpe-mbtn r78" onclick="selectRPE(7,this)"><span class="rpe-num">7</span><span class="rpe-hint">😤 힘듦</span><span class="rpe-breath">말하기 어려움</span></button>
+      <button class="rpe-mbtn r78" onclick="selectRPE(8,this)"><span class="rpe-num">8</span><span class="rpe-hint">🥵 매우힘듦</span><span class="rpe-breath">거의 못함</span></button>
+      <button class="rpe-mbtn r910" onclick="selectRPE(9,this)"><span class="rpe-num">9</span><span class="rpe-hint">😵 극한</span><span class="rpe-breath">말 불가</span></button>
+      <button class="rpe-mbtn r910" onclick="selectRPE(10,this)"><span class="rpe-num">10</span><span class="rpe-hint">💀 최대</span><span class="rpe-breath">전력 질주</span></button>
     </div>
     <div class="rpe-rec">💡 권장 RPE: <span id="rpe-rec-txt">—</span></div>
     <div class="extra-fields">
@@ -328,6 +330,7 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
       </div>
     </div>
     <textarea class="memo-input" id="ef-memo" placeholder="오늘의 한 줄 메모 (날씨, 컨디션, 느낌...)"></textarea>
+    <button class="modal-save-btn" id="rpe-save-btn" onclick="saveRPE()" disabled>RPE를 선택하세요</button>
     <button class="detail-close" onclick="skipRPE()">기록하지 않고 닫기</button>
   </div>
 </div>
@@ -669,6 +672,7 @@ let wakeLock = null;
 let detailIdx = null;
 let detailMap = null;            // 기록 상세 지도 인스턴스 (재오픈 시 제거용)
 let lastTick = 0;                // 타임스탬프 기반 타이머용 (백그라운드 드리프트 방지)
+let selectedRPE = null;          // RPE 모달에서 선택된 강도(저장 전까지 보관)
 let mapRotate = localStorage.getItem('run-maprotate') !== '0'; // 기본: 진행방향 회전 ON
 
 // ════════════════════════════════════════
@@ -978,10 +982,30 @@ function finishWorkout(partial) {
     document.getElementById('ef-pace').value = '';
   }
   document.getElementById('ef-memo').value = '';
+  resetRPESelection();   // 이전 선택 초기화
   document.getElementById('rpe-modal').classList.add('show');
 }
 
-function submitRPE(v) {
+// RPE는 선택만 하고, 거리·메모 입력 후 저장 버튼으로 기록한다
+function selectRPE(v, btn) {
+  selectedRPE = v;
+  document.querySelectorAll('.rpe-mbtn').forEach(b => b.classList.remove('sel'));
+  if (btn) btn.classList.add('sel');
+  const save = document.getElementById('rpe-save-btn');
+  save.disabled = false;
+  save.textContent = `RPE ${v}로 기록 저장`;
+}
+
+function resetRPESelection() {
+  selectedRPE = null;
+  document.querySelectorAll('.rpe-mbtn').forEach(b => b.classList.remove('sel'));
+  const save = document.getElementById('rpe-save-btn');
+  save.disabled = true;
+  save.textContent = 'RPE를 선택하세요';
+}
+
+function saveRPE() {
+  if (!selectedRPE) { alert('운동 강도(RPE)를 먼저 선택하세요!'); return; }
   document.getElementById('rpe-modal').classList.remove('show');
   const prog = PROGS[curProg]?.name || '커스텀';
   const mins = Math.round(elapsed / 60);
@@ -991,7 +1015,7 @@ function submitRPE(v) {
   const hist = getHist();
   hist.unshift({
     date: new Date().toISOString(), program: prog, duration: mins,
-    rpe: v, dist, pace, memo,
+    rpe: selectedRPE, dist, pace, memo,
     route: gpsCoords.length > 1 ? gpsCoords.map(c => [c[0], c[1]]) : null
   });
   if (hist.length > 100) hist.pop();
