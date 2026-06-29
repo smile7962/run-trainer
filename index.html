@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d0d0d">
@@ -328,6 +328,19 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
       </div>
     </div>
     <textarea class="memo-input" id="ef-memo" placeholder="오늘의 한 줄 메모 (날씨, 컨디션, 느낌...)"></textarea>
+    <button class="detail-close" onclick="skipRPE()">기록하지 않고 닫기</button>
+  </div>
+</div>
+
+<!-- ══ 일시정지 모달 ══ -->
+<div class="modal-overlay" id="pause-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">⏸ 일시정지</div>
+    <div class="modal-sub" id="pause-sub">지금까지 운동을 기록할까요?</div>
+    <button class="modal-save-btn" onclick="resumeFromPause()">▶ 계속하기</button>
+    <button class="detail-close" onclick="finishFromPause()">🏁 여기까지 기록하고 종료</button>
+    <button class="del-btn" onclick="discardFromPause()">🗑 기록 없이 종료</button>
   </div>
 </div>
 
@@ -632,6 +645,8 @@ const PROGS = {
   }
 };
 const TAG_CLS = {'고강도':'tag-hard','중강도':'tag-med','저강도':'tag-easy'};
+// MET 값 단일 출처 (PROGS에서 파생 — 기록/칼로리 계산 공용)
+const MET_BY_NAME = Object.fromEntries(Object.values(PROGS).map(p => [p.name, p.met]));
 const YT = [
   {cat:'자세',  icon:'🏃', title:'달리기 올바른 자세',     q:'달리기 올바른 자세 초보자'},
   {cat:'자세',  icon:'🦵', title:'미드풋 착지 방법',       q:'달리기 미드풋 착지 방법'},
@@ -652,6 +667,8 @@ let locked = false, lockPressTimer = null;
 let gpsWatch = null, gpsCoords = [], gpsMap = null, gpsPolyline = null, gpsMarker = null;
 let wakeLock = null;
 let detailIdx = null;
+let detailMap = null;            // 기록 상세 지도 인스턴스 (재오픈 시 제거용)
+let lastTick = 0;                // 타임스탬프 기반 타이머용 (백그라운드 드리프트 방지)
 let mapRotate = localStorage.getItem('run-maprotate') !== '0'; // 기본: 진행방향 회전 ON
 
 // ════════════════════════════════════════
@@ -759,16 +776,18 @@ function renderStreakBars(barsId, daysId) {
 function selectAndStart(key) {
   curProg = key;
   if (key === 'custom') {
-    const r = prompt('달리기 시간(초):', '60') || '60';
-    const w = prompt('휴식 시간(초):', '30') || '30';
-    const s = prompt('세트 수:', '8') || '8';
+    // 잘못된 입력(빈값/문자/음수)에도 안전하도록 범위 보정
+    const r = Math.min(3600, Math.max(5,  parseInt(prompt('달리기 시간(초):', '60'), 10) || 60));
+    const w = Math.min(3600, Math.max(0,  parseInt(prompt('휴식 시간(초):', '30'), 10) || 30));
+    const s = Math.min(30,   Math.max(1,  parseInt(prompt('세트 수:', '8'),    10) || 8));
     PROGS.custom.steps = [{t:'warm',l:'워밍업',d:120}];
-    for (let i = 0; i < parseInt(s); i++) {
-      PROGS.custom.steps.push({t:'run',l:`달리기 ${i+1}`,d:parseInt(r)});
-      if (parseInt(w) > 0) PROGS.custom.steps.push({t:'rest',l:`휴식 ${i+1}`,d:parseInt(w)});
+    for (let i = 0; i < s; i++) {
+      PROGS.custom.steps.push({t:'run',l:`달리기 ${i+1}`,d:r});
+      if (w > 0) PROGS.custom.steps.push({t:'rest',l:`휴식 ${i+1}`,d:w});
     }
     PROGS.custom.steps.push({t:'rest',l:'쿨다운',d:120});
   }
+  clearProgress();   // 새 운동 시작 → 이전 진행상태 폐기
   steps = [...PROGS[key].steps];
   stepIdx = 0; elapsed = 0; gpsCoords = []; running = false;
   document.getElementById('t-progname').textContent = PROGS[key].name;
@@ -847,35 +866,53 @@ function toggleTimer() {
     document.getElementById('play-label').textContent = '재개';
     stopGPS();
     releaseWakeLock();
+    saveProgress();
+    if (elapsed > 0) showPauseSheet();   // 🆕 중도 일시정지 → 기록 여부 묻기
   } else {
     running = true;
     document.getElementById('play-icon').textContent = '⏸';
     document.getElementById('play-label').textContent = '일시정지';
     startGPS();
     requestWakeLock();
-    timerInt = setInterval(() => {
-      if (timeLeft <= 0) {
-        beep(steps[stepIdx]?.t);
-        vibrate([200, 100, 200]);
-        stepIdx++;
-        if (stepIdx >= steps.length) { clearInterval(timerInt); finishWorkout(); return; }
-        loadStep(stepIdx);
-      } else {
-        timeLeft--; elapsed++;
-        if (timeLeft <= 3 && timeLeft > 0) { beep('tick'); vibrate([50]); }
-        updateTimerUI();
-      }
-    }, 1000);
+    // 실제 경과 시간(Date.now)을 기준으로 계산 → 백그라운드/화면꺼짐에도 정확
+    lastTick = Date.now();
+    timerInt = setInterval(tick, 1000);
   }
+}
+
+// 타임스탬프 기반 카운트다운. setInterval이 백그라운드에서 throttle되어도
+// 실제 흐른 시간(delta)만큼 따라잡아 단계가 밀리지 않게 한다.
+function tick() {
+  if (!running) return;
+  const now = Date.now();
+  let delta = Math.floor((now - lastTick) / 1000);
+  if (delta < 1) return;
+  lastTick += delta * 1000;
+  const realtime = delta === 1;   // 포그라운드 정상 틱일 때만 비프/진동
+  while (delta > 0) {
+    const step = Math.min(delta, timeLeft);
+    timeLeft -= step; elapsed += step; delta -= step;
+    if (realtime && timeLeft > 0 && timeLeft <= 3) { beep('tick'); vibrate([50]); }
+    if (timeLeft <= 0) {
+      if (realtime) { beep(steps[stepIdx]?.t); vibrate([200, 100, 200]); }
+      stepIdx++;
+      if (stepIdx >= steps.length) { clearInterval(timerInt); updateTimerUI(); finishWorkout(); return; }
+      loadStep(stepIdx);   // timeLeft = 다음 단계 길이로 재설정
+    }
+  }
+  updateTimerUI();
+  if (elapsed % 5 === 0) saveProgress();   // 5초마다 진행상태 백업
 }
 
 function skipPhase() {
   clearInterval(timerInt); running = false;
   document.getElementById('play-icon').textContent = '▶';
   document.getElementById('play-label').textContent = '재개';
-  elapsed += timeLeft; stepIdx++;
+  // 건너뛴 남은 시간은 실제로 운동한 시간이 아니므로 elapsed에 더하지 않는다
+  stepIdx++;
   if (stepIdx >= steps.length) { finishWorkout(); return; }
   loadStep(stepIdx);
+  saveProgress();
 }
 
 function resetTimer() {
@@ -886,6 +923,10 @@ function resetTimer() {
   document.getElementById('ts-pace').textContent = '—';
   document.getElementById('ts-kcal').textContent = '0';
   stopGPS(); releaseWakeLock();
+  clearProgress();
+  // 지도에 남은 이전 경로/마커 제거
+  if (gpsPolyline) gpsPolyline.setLatLngs([]);
+  if (gpsMarker && gpsMap) { gpsMap.removeLayer(gpsMarker); gpsMarker = null; }
   if (steps.length) loadStep(0);
 }
 
@@ -900,13 +941,20 @@ function renderStepsList() {
   if (cur) cur.scrollIntoView({block:'nearest'});
 }
 
-function finishWorkout() {
+function finishWorkout(partial) {
   clearInterval(timerInt); running = false;
   stopGPS(); releaseWakeLock();
+  clearProgress();   // 운동 종료 → 이어하기용 진행상태 폐기
   const badge = document.getElementById('t-badge');
-  badge.className = 't-badge b-done'; badge.textContent = '✅ 완료!';
-  document.getElementById('t-phaselabel').textContent = '훌륭합니다! 🎉';
-  document.getElementById('t-nextlabel').textContent = '오늘도 잘 달렸습니다';
+  if (partial) {
+    badge.className = 't-badge b-rest'; badge.textContent = '⏹ 종료';
+    document.getElementById('t-phaselabel').textContent = '여기까지 잘했어요 👏';
+    document.getElementById('t-nextlabel').textContent = '중간에 마친 운동을 기록합니다';
+  } else {
+    badge.className = 't-badge b-done'; badge.textContent = '✅ 완료!';
+    document.getElementById('t-phaselabel').textContent = '훌륭합니다! 🎉';
+    document.getElementById('t-nextlabel').textContent = '오늘도 잘 달렸습니다';
+  }
   document.getElementById('play-icon').textContent = '▶';
   document.getElementById('play-label').textContent = '다시 시작';
   document.getElementById('t-bigtime').textContent = '00:00';
@@ -948,7 +996,67 @@ function submitRPE(v) {
   });
   if (hist.length > 100) hist.pop();
   saveHist(hist);
+  clearProgress();
   renderHome();
+  nav('home', document.querySelectorAll('.bnav-btn')[0]);
+}
+
+// RPE 모달에서 기록하지 않고 닫기 (#5 — 모달에 갇히지 않도록)
+function skipRPE() {
+  document.getElementById('rpe-modal').classList.remove('show');
+  clearProgress();
+  nav('home', document.querySelectorAll('.bnav-btn')[0]);
+}
+
+// ════════ 일시정지 시트 (🆕) ════════
+function showPauseSheet() {
+  const mins = Math.round(elapsed / 60);
+  const dist = gpsCoords.length > 1 ? calcTotalDist(gpsCoords).toFixed(2) : null;
+  document.getElementById('pause-sub').textContent =
+    `지금까지 ${mins}분${dist ? ' · ' + dist + 'km' : ''} 달렸어요. 계속할까요, 여기서 기록할까요?`;
+  document.getElementById('pause-modal').classList.add('show');
+}
+function hidePauseSheet() { document.getElementById('pause-modal').classList.remove('show'); }
+function resumeFromPause() { hidePauseSheet(); if (!running) toggleTimer(); }   // 재개
+function finishFromPause() { hidePauseSheet(); finishWorkout(true); }            // 부분 기록
+function discardFromPause() {
+  if (!confirm('기록하지 않고 종료할까요?')) return;
+  hidePauseSheet();
+  resetTimer();
+  nav('home', document.querySelectorAll('.bnav-btn')[0]);
+}
+
+// ════════ 진행상태 저장/복원 (#6) ════════
+function saveProgress() {
+  if (!curProg || !steps.length) return;
+  try {
+    localStorage.setItem('run-progress', JSON.stringify({
+      curProg, steps, stepIdx, timeLeft, elapsed, gpsCoords, ts: Date.now()
+    }));
+  } catch (e) {}
+}
+function clearProgress() { try { localStorage.removeItem('run-progress'); } catch (e) {} }
+function checkResume() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem('run-progress') || 'null'); } catch (e) { p = null; }
+  if (!p || !p.steps || !p.steps.length) return;
+  // 6시간 지난 진행상태 / 의미 없는(거의 시작 안 한) 운동은 무시
+  if (Date.now() - (p.ts || 0) > 6 * 3600 * 1000 || (p.elapsed || 0) < 30) { clearProgress(); return; }
+  if (!confirm('진행 중이던 운동이 있어요. 이어서 할까요?')) { clearProgress(); return; }
+  curProg = p.curProg;
+  steps = p.steps;
+  stepIdx = Math.min(p.stepIdx || 0, steps.length - 1);
+  elapsed = p.elapsed || 0;
+  gpsCoords = p.gpsCoords || [];
+  running = false;
+  document.getElementById('t-progname').textContent = PROGS[curProg]?.name || '커스텀';
+  loadStep(stepIdx);
+  timeLeft = Math.min(p.timeLeft || steps[stepIdx].d, steps[stepIdx].d);   // 멈췄던 지점부터
+  document.getElementById('play-icon').textContent = '▶';
+  document.getElementById('play-label').textContent = '재개';
+  updateTimerUI();
+  renderStepsList();
+  nav('timer', document.querySelectorAll('.bnav-btn')[1]);
 }
 
 // ════════════════════════════════════════
@@ -1133,7 +1241,7 @@ function renderYT() {
   Object.entries(cats).forEach(([cat, items]) => {
     html += `<div class="yt-sec-head">${cat}</div>`;
     items.forEach(v => {
-      html += `<div class="yt-card" onclick="window.open('https://www.youtube.com/results?search_query=${encodeURIComponent(v.q)}','_blank')">
+      html += `<div class="yt-card" onclick="window.open('https://www.youtube.com/results?search_query=${encodeURIComponent(v.q)}','_blank','noopener')">
         <div class="yt-box">${v.icon}</div>
         <div class="yt-info">
           <div class="yt-cat">${v.cat}</div>
@@ -1179,7 +1287,6 @@ function renderRecord() {
 
   // 기록 목록
   const body = JSON.parse(localStorage.getItem('run-body') || 'null');
-  const MET = {'이지 런':8,'인터벌':11,'파틀렉':9,'템포 런':10,'장거리 런':8.5,'커스텀':9};
   const listEl = document.getElementById('hist-list');
   if (!hist.length) {
     listEl.innerHTML = '<div class="empty-state">아직 운동 기록이 없습니다.<br>첫 번째 달리기를 시작해보세요! 🏃</div>';
@@ -1188,15 +1295,16 @@ function renderRecord() {
   listEl.innerHTML = hist.map((h, i) => {
     const d = new Date(h.date);
     const ds = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    const met = MET[h.program] || 9;
+    const met = MET_BY_NAME[h.program] || 9;
     const kcalStr = body ? ` · 🔥${Math.round(met*body.weight*(h.duration/60))}kcal` : '';
     const distStr = h.dist ? ` · 📍${h.dist}km` : '';
+    // 사용자 입력(메모/프로그램명)은 innerHTML 삽입 전 escape — XSS 방지
     return `<div class="hist-item" onclick="showDetail(${i})">
       <div class="h-dot"></div>
       <div class="h-main">
-        <div class="h-prog">${h.program}</div>
+        <div class="h-prog">${escapeHtml(h.program)}</div>
         <div class="h-sub">${h.duration}분 · RPE ${h.rpe}${distStr}${kcalStr}</div>
-        ${h.memo ? `<div class="h-sub" style="margin-top:2px;font-style:italic">"${h.memo}"</div>` : ''}
+        ${h.memo ? `<div class="h-sub" style="margin-top:2px;font-style:italic">"${escapeHtml(h.memo)}"</div>` : ''}
       </div>
       <div class="h-meta">${ds}</div>
     </div>`;
@@ -1238,18 +1346,19 @@ function showDetail(idx) {
   const memoEl = document.getElementById('dm-memo');
   if (h.memo) { memoEl.textContent = '"' + h.memo + '"'; memoEl.style.display = 'block'; }
   else memoEl.style.display = 'none';
-  // 지도
+  // 지도 — 이전 인스턴스를 반드시 제거해야 재오픈 시 "already initialized" 오류가 안 난다
+  if (detailMap) { detailMap.remove(); detailMap = null; }
   const mapEl = document.getElementById('dm-map');
   mapEl.innerHTML = '';
   if (h.route && h.route.length > 1 && typeof L !== 'undefined') {
     mapEl.style.display = 'block';
     setTimeout(() => {
-      const m = L.map(mapEl, {zoomControl:false, attributionControl:false});
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-      const poly = L.polyline(h.route, {color:'#e05a2b', weight:4}).addTo(m);
-      m.fitBounds(poly.getBounds(), {padding:[20,20]});
-      L.circleMarker(h.route[0], {radius:6, color:'white', fillColor:'#2d9e5f', fillOpacity:1, weight:2}).addTo(m);
-      L.circleMarker(h.route[h.route.length-1], {radius:6, color:'white', fillColor:'#e05a2b', fillOpacity:1, weight:2}).addTo(m);
+      detailMap = L.map(mapEl, {zoomControl:false, attributionControl:false});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(detailMap);
+      const poly = L.polyline(h.route, {color:'#e05a2b', weight:4}).addTo(detailMap);
+      detailMap.fitBounds(poly.getBounds(), {padding:[20,20]});
+      L.circleMarker(h.route[0], {radius:6, color:'white', fillColor:'#2d9e5f', fillOpacity:1, weight:2}).addTo(detailMap);
+      L.circleMarker(h.route[h.route.length-1], {radius:6, color:'white', fillColor:'#e05a2b', fillOpacity:1, weight:2}).addTo(detailMap);
     }, 100);
   } else {
     mapEl.style.display = 'block';
@@ -1262,6 +1371,7 @@ function showDetail(idx) {
 
 function closeDetail() {
   document.getElementById('detail-modal').classList.remove('show');
+  if (detailMap) { detailMap.remove(); detailMap = null; }
 }
 
 function deleteRecord(idx) {
@@ -1306,11 +1416,11 @@ function calcBMI() {
   document.getElementById('bmi-ideal').textContent = ideal;
   res.style.display = 'block';
   const progs = [
-    {name:'이지 런',met:8.0,mins:35},{name:'인터벌',met:11.0,mins:22},
-    {name:'파틀렉',met:9.0,mins:27},{name:'템포 런',met:10.0,mins:40},{name:'장거리 런',met:8.5,mins:55}
+    {name:'이지 런',mins:35},{name:'인터벌',mins:22},
+    {name:'파틀렉',mins:27},{name:'템포 런',mins:40},{name:'장거리 런',mins:55}
   ];
   document.getElementById('cal-list').innerHTML = progs.map(p => {
-    const kcal = Math.round(p.met * w * (p.mins / 60));
+    const kcal = Math.round((MET_BY_NAME[p.name] || 9) * w * (p.mins / 60));
     return `<div class="cal-item"><span class="cal-prog">${p.name} (${p.mins}분)</span><span class="cal-kcal">${kcal} kcal</span></div>`;
   }).join('');
   localStorage.setItem('run-body', JSON.stringify({height:h, weight:w}));
@@ -1328,7 +1438,19 @@ function loadBodyInfo() {
 // UTILS
 // ════════════════════════════════════════
 function getHist() { return JSON.parse(localStorage.getItem('run-history') || '[]'); }
-function saveHist(h) { localStorage.setItem('run-history', JSON.stringify(h)); }
+function saveHist(h) {
+  try {
+    localStorage.setItem('run-history', JSON.stringify(h));
+  } catch (e) {
+    // 사파리 프라이빗 모드 / 용량 초과 등 → 앱이 죽지 않도록 안내만
+    alert('기록을 저장할 수 없습니다. 브라우저 저장공간이 가득 찼거나 프라이빗 모드일 수 있어요.');
+  }
+}
+// 사용자 입력을 innerHTML에 넣기 전 이스케이프
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function clearAll() { if (confirm('모든 기록을 삭제할까요?')) { localStorage.removeItem('run-history'); renderRecord(); } }
 
 function localDate(d) {
@@ -1351,8 +1473,18 @@ function calcStreak(hist) {
 // ════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════
+// 백그라운드에서 돌아오면: 흐른 시간 따라잡기(#1) + 자동 해제된 화면잠금 재획득(#8)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && running) { tick(); requestWakeLock(); }
+});
+// 일시정지 시트 바깥 영역을 누르면 '계속하기'로 처리
+document.getElementById('pause-modal').addEventListener('click', e => {
+  if (e.target.id === 'pause-modal') resumeFromPause();
+});
+
 renderHome();
 renderYT();
+checkResume();   // 진행 중이던 운동이 있으면 이어하기 (#6)
 </script>
 </body>
 </html>
