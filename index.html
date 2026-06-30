@@ -296,6 +296,9 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
 .st-ctl button:active{background:rgba(255,255,255,.22);}
 .st-val{min-width:74px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.92rem;color:#fff;}
 .st-total{text-align:center;font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--run);margin:16px 0 14px;letter-spacing:.05em;}
+.st-toggle{display:flex;gap:0;background:rgba(255,255,255,.08);border-radius:11px;padding:3px;margin:2px 0 8px;}
+.st-toggle button{flex:1;padding:10px;border:none;background:none;border-radius:8px;color:rgba(255,255,255,.55);font-weight:700;font-size:.85rem;cursor:pointer;font-family:inherit;}
+.st-toggle button.on{background:var(--run);color:#fff;}
 
 /* detail modal */
 .detail-map{width:100%;height:180px;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#1a2a3a;}
@@ -439,7 +442,7 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
       </svg>
       <div class="ring-inner">
         <div class="t-bigtime" id="t-bigtime">00:00</div>
-        <div class="t-timesub">남은 시간</div>
+        <div class="t-timesub" id="t-timesub">남은 시간</div>
       </div>
     </div>
     <div class="t-phaselabel" id="t-phaselabel">프로그램을 선택하세요</div>
@@ -643,7 +646,8 @@ const PROGS = {
     name:'인터벌', em:'⚡', desc:'빠른 달리기 + 회복 조깅 반복. 심폐 향상.',
     tags:['고강도','35분','RPE 8~9'], met:11.0, rec:'8~9',
     steps: makeIntervalSteps(),
-    tune:{kind:'interval', warm:300, sets:6, run:90, rest:60, cool:300,
+    tune:{kind:'interval', mode:'time', warm:300, sets:6, run:90, rest:60, cool:300,
+      runDist:400, pace:330,   // 거리 모드: 각 세트 거리(m) + 목표 페이스(초/km, 신호약할 때 시간 환산용)
       setsMin:2, setsMax:15, runStep:15, restStep:15}
   },
   fartlek: {
@@ -722,6 +726,8 @@ let detailMap = null;            // 기록 상세 지도 인스턴스 (재오픈
 let lastTick = 0;                // 타임스탬프 기반 타이머용 (백그라운드 드리프트 방지)
 let selectedRPE = null;          // RPE 모달에서 선택된 강도(저장 전까지 보관)
 let startKey = null, startTune = null;   // 시작 전 시간 조절 시트 상태
+let phaseStartDist = 0;                   // 거리 인터벌: 현재 구간 시작 시점의 누적거리(km)
+let lastGpsFixTs = 0;                      // 마지막 GPS 수신 시각 (신호 건강도 판단)
 let mapRotate = localStorage.getItem('run-maprotate') !== '0'; // 기본: 진행방향 회전 ON
 
 // ════════════════════════════════════════
@@ -876,7 +882,13 @@ function buildFromTune(t) {
   if (t.kind === 'interval') {
     const s = [{t:'warm', l:'워밍업', d:t.warm}];
     for (let i = 0; i < t.sets; i++) {
-      s.push({t:'run', l:`인터벌 ${i+1}`, d:t.run});
+      if (t.mode === 'dist') {
+        // d는 GPS 신호가 약할 때 쓰는 페이스 환산 시간(폴백). dist는 GPS 목표 거리(m)
+        const fb = Math.max(5, Math.round(t.runDist / 1000 * t.pace));
+        s.push({t:'run', l:`인터벌 ${i+1}`, d:fb, dist:t.runDist});
+      } else {
+        s.push({t:'run', l:`인터벌 ${i+1}`, d:t.run});
+      }
       if (t.rest > 0) s.push({t:'rest', l:`회복 ${i+1}`, d:t.rest});
     }
     s.push({t:'rest', l:'쿨다운', d:t.cool});
@@ -900,27 +912,43 @@ function fixedRow(label, sec) {
   return `<div class="st-row"><div class="st-lbl">${label}</div><div class="st-fixed">${fmtDur(sec)} · 고정</div></div>`;
 }
 
+function fmtPace(sec) { return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}/km`; }
+
 function renderStartSheet() {
   const p = PROGS[startKey], t = startTune;
   document.getElementById('start-title').textContent = `${p.em} ${p.name}`;
   let rows = '';
+  let totalText = `총 ${fmtDur(totalOf(buildFromTune(t)))}`;
   if (t.kind === 'steady') {
     t.warm.forEach(w => rows += fixedRow(w.l, w.d));
     rows += stepRow('달리기 시간', null, 'run', fmtDur(t.run.d));
     t.cool.forEach(c => rows += fixedRow(c.l, c.d));
   } else if (t.kind === 'interval') {
+    // 시간 기준 / 거리 기준 토글
+    rows += `<div class="st-toggle">`
+      + `<button class="${t.mode==='time'?'on':''}" onclick="tuneSetMode('time')">⏱ 시간 기준</button>`
+      + `<button class="${t.mode==='dist'?'on':''}" onclick="tuneSetMode('dist')">📍 거리 기준</button></div>`;
     rows += fixedRow('워밍업', t.warm);
     rows += stepRow('세트 수', null, 'sets', `${t.sets}세트`);
-    rows += stepRow('달리기 (각 세트)', null, 'run', fmtDur(t.run));
+    if (t.mode === 'dist') {
+      rows += stepRow('달리기 거리 (각 세트)', '100m 단위', 'runDist', `${t.runDist}m`);
+      rows += stepRow('목표 페이스', 'GPS 약할 때 시간 환산 기준', 'pace', fmtPace(t.pace));
+    } else {
+      rows += stepRow('달리기 (각 세트)', null, 'run', fmtDur(t.run));
+    }
     rows += stepRow('회복 (각 세트)', null, 'rest', fmtDur(t.rest));
     rows += fixedRow('쿨다운', t.cool);
+    if (t.mode === 'dist') {
+      const km = (t.sets * t.runDist / 1000).toFixed(1);
+      totalText = `달리기 ${km}km · 예상 ${fmtDur(totalOf(buildFromTune(t)))}`;
+    }
   } else if (t.kind === 'scale') {
     const built = buildFromTune(t);
     const runSec = built.filter(s => s.t === 'run').reduce((a, s) => a + s.d, 0);
     rows += stepRow('달리기 길이', `배율 ×${t.scale.toFixed(2)} · 워밍업/쿨다운 고정`, 'scale', fmtDur(runSec));
   }
   document.getElementById('start-body').innerHTML = rows;
-  document.getElementById('start-total').textContent = `총 ${fmtDur(totalOf(buildFromTune(t)))}`;
+  document.getElementById('start-total').textContent = totalText;
 }
 
 function tuneAdjust(field, dir) {
@@ -928,14 +956,18 @@ function tuneAdjust(field, dir) {
   if (t.kind === 'steady' && field === 'run') {
     t.run.d = clamp(t.run.d + dir * t.run.step, t.run.min, t.run.max);
   } else if (t.kind === 'interval') {
-    if (field === 'sets') t.sets = clamp(t.sets + dir, t.setsMin, t.setsMax);
-    if (field === 'run')  t.run  = clamp(t.run + dir * t.runStep, 15, 600);
-    if (field === 'rest') t.rest = clamp(t.rest + dir * t.restStep, 0, 300);
+    if (field === 'sets')    t.sets    = clamp(t.sets + dir, t.setsMin, t.setsMax);
+    if (field === 'run')     t.run     = clamp(t.run + dir * t.runStep, 15, 600);
+    if (field === 'rest')    t.rest    = clamp(t.rest + dir * t.restStep, 0, 300);
+    if (field === 'runDist') t.runDist = clamp(t.runDist + dir * 100, 100, 3000);   // 100m 단위
+    if (field === 'pace')    t.pace    = clamp(t.pace + dir * 15, 180, 600);         // 15초 단위
   } else if (t.kind === 'scale' && field === 'scale') {
     t.scale = clamp(+(t.scale + dir * t.step).toFixed(2), t.min, t.max);
   }
   renderStartSheet();
 }
+
+function tuneSetMode(mode) { startTune.mode = mode; renderStartSheet(); }
 
 function resetStartTune() {
   startTune = JSON.parse(JSON.stringify(PROGS[startKey].tune));
@@ -955,6 +987,7 @@ function loadStep(idx) {
   if (idx >= steps.length) { finishWorkout(); return; }
   const s = steps[idx];
   timeLeft = s.d; stepTotal = s.d;
+  phaseStartDist = gpsCoords.length > 1 ? calcTotalDist(gpsCoords) : 0;   // 거리 인터벌 기준점
   const badge = document.getElementById('t-badge');
   badge.className = 't-badge';
   if (s.t === 'run')       { badge.classList.add('b-run');  badge.textContent = '🔥 달리기'; }
@@ -968,14 +1001,27 @@ function loadStep(idx) {
 }
 
 function updateTimerUI() {
-  const m = String(Math.floor(timeLeft/60)).padStart(2,'0');
-  const s = String(timeLeft % 60).padStart(2,'0');
-  document.getElementById('t-bigtime').textContent = `${m}:${s}`;
-  document.getElementById('lock-time').textContent = `${m}:${s}`;
-  const pct = stepTotal > 0 ? (stepTotal - timeLeft) / stepTotal : 0;
+  const cur = steps[stepIdx];
+  let bigStr, subStr, pct;
+  if (cur && cur.dist && gpsHealthy()) {
+    // 거리 구간 + GPS 정상 → 남은 거리 표시, 링은 거리 비율
+    const covered = currentPhaseMeters();
+    bigStr = `${Math.max(0, Math.round(cur.dist - covered))}m`;
+    subStr = `남은 거리 · 목표 ${cur.dist}m`;
+    pct = clamp(covered / cur.dist, 0, 1);
+  } else {
+    const m = String(Math.floor(timeLeft/60)).padStart(2,'0');
+    const s = String(timeLeft % 60).padStart(2,'0');
+    bigStr = `${m}:${s}`;
+    subStr = (cur && cur.dist) ? 'GPS 대기 · 시간 기준 진행' : '남은 시간';
+    pct = stepTotal > 0 ? (stepTotal - timeLeft) / stepTotal : 0;
+  }
+  document.getElementById('t-bigtime').textContent = bigStr;
+  document.getElementById('lock-time').textContent = bigStr;
+  const tsub = document.getElementById('t-timesub'); if (tsub) tsub.textContent = subStr;
   document.getElementById('ring-fg').style.strokeDashoffset = 552.9 * (1 - pct);
   document.getElementById('t-phasefill').style.width = (pct * 100) + '%';
-  const t = steps[stepIdx]?.t;
+  const t = cur?.t;
   const col = t === 'run' ? 'var(--run)' : t === 'rest' ? 'var(--rest)' : 'var(--warm)';
   document.getElementById('ring-fg').style.stroke = col;
   document.getElementById('t-phasefill').style.background = col;
@@ -1000,8 +1046,8 @@ function updateTimerUI() {
 function updateNextLabel() {
   const next = steps[stepIdx + 1];
   if (next) {
-    const nm = Math.floor(next.d/60), ns = next.d % 60;
-    document.getElementById('t-nextlabel').textContent = `다음: ${next.l} (${nm}:${String(ns).padStart(2,'0')})`;
+    const amt = next.dist ? `${next.dist}m` : `${Math.floor(next.d/60)}:${String(next.d % 60).padStart(2,'0')}`;
+    document.getElementById('t-nextlabel').textContent = `다음: ${next.l} (${amt})`;
   } else {
     document.getElementById('t-nextlabel').textContent = '마지막 단계';
   }
@@ -1032,8 +1078,18 @@ function toggleTimer() {
   }
 }
 
+// 현재 구간에서 GPS로 이동한 거리(m)
+function currentPhaseMeters() {
+  const total = gpsCoords.length > 1 ? calcTotalDist(gpsCoords) : 0;
+  return Math.max(0, (total - phaseStartDist) * 1000);
+}
+// GPS 신호가 건강한가 (최근 8초 내 수신 + 좌표 2개 이상)
+function gpsHealthy() { return gpsCoords.length >= 2 && (Date.now() - lastGpsFixTs) < 8000; }
+
 // 타임스탬프 기반 카운트다운. setInterval이 백그라운드에서 throttle되어도
 // 실제 흐른 시간(delta)만큼 따라잡아 단계가 밀리지 않게 한다.
+// 거리 인터벌(run에 dist 있음)은 GPS가 건강하면 '거리 도달'로 종료하고,
+// 신호가 약하거나(백그라운드 복귀 포함) 없으면 페이스 환산 시간으로 폴백한다.
 function tick() {
   if (!running) return;
   const now = Date.now();
@@ -1041,12 +1097,18 @@ function tick() {
   if (delta < 1) return;
   lastTick += delta * 1000;
   const realtime = delta === 1;   // 포그라운드 정상 틱일 때만 비프/진동
+  const bigJump = delta > 2;      // 백그라운드 복귀 → 거리 대기 대신 시간 폴백
   while (delta > 0) {
-    const step = Math.min(delta, timeLeft);
-    timeLeft -= step; elapsed += step; delta -= step;
-    if (realtime && timeLeft > 0 && timeLeft <= 3) { beep('tick'); vibrate([50]); }
-    if (timeLeft <= 0) {
-      if (realtime) { beep(steps[stepIdx]?.t); vibrate([200, 100, 200]); }
+    const s = steps[stepIdx];
+    const distWait = !!(s && s.dist && gpsHealthy() && !bigJump);
+    const chunk = Math.min(delta, Math.max(timeLeft, 1));
+    const dec = Math.min(timeLeft, chunk);
+    timeLeft -= dec; elapsed += chunk; delta -= chunk;
+    if (realtime && !distWait && timeLeft > 0 && timeLeft <= 3) { beep('tick'); vibrate([50]); }
+    // 종료 판정: 거리 대기면 거리 도달 시(시간 0이어도 거리 미달이면 계속 대기), 아니면 시간 소진
+    const done = distWait ? (currentPhaseMeters() >= s.dist) : (timeLeft <= 0);
+    if (done) {
+      if (realtime) { beep(s?.t); vibrate([200, 100, 200]); }
       stepIdx++;
       if (stepIdx >= steps.length) { clearInterval(timerInt); updateTimerUI(); finishWorkout(); return; }
       loadStep(stepIdx);   // timeLeft = 다음 단계 길이로 재설정
@@ -1054,6 +1116,23 @@ function tick() {
   }
   updateTimerUI();
   if (elapsed % 5 === 0) saveProgress();   // 5초마다 진행상태 백업
+}
+
+// 거리 구간에서 목표 거리에 도달하면 GPS 콜백에서 즉시 다음 단계로 (틱을 기다리지 않음)
+function maybeAdvanceFromGPS() {
+  if (!running) return;
+  const s = steps[stepIdx];
+  if (!s || !s.dist || !gpsHealthy()) return;
+  if (currentPhaseMeters() >= s.dist) {
+    const now = Date.now();
+    elapsed += Math.max(0, Math.floor((now - lastTick) / 1000));   // 직전 틱 이후 경과 반영
+    lastTick = now;
+    beep(s.t); vibrate([200, 100, 200]);
+    stepIdx++;
+    if (stepIdx >= steps.length) { clearInterval(timerInt); running = false; updateTimerUI(); finishWorkout(); return; }
+    loadStep(stepIdx);
+    updateTimerUI();
+  }
 }
 
 function skipPhase() {
@@ -1086,8 +1165,8 @@ function renderStepsList() {
   document.getElementById('steps-list').innerHTML = steps.map((s, i) => {
     const cls = i < stepIdx ? 'done' : i === stepIdx ? 'cur' : '';
     const pip = i < stepIdx ? 'dp' : (s.t === 'run' ? 'run' : s.t === 'rest' ? 'rest' : 'warm');
-    const m = Math.floor(s.d/60), sec = s.d % 60;
-    return `<div class="step-row ${cls}"><div class="s-pip ${pip}"></div><span>${s.l}</span><span class="s-dur">${m}:${String(sec).padStart(2,'0')}</span></div>`;
+    const dur = s.dist ? `${s.dist}m` : `${Math.floor(s.d/60)}:${String(s.d % 60).padStart(2,'0')}`;
+    return `<div class="step-row ${cls}"><div class="s-pip ${pip}"></div><span>${s.l}</span><span class="s-dur">${dur}</span></div>`;
   }).join('');
   const cur = document.querySelector('.step-row.cur');
   if (cur) cur.scrollIntoView({block:'nearest'});
@@ -1292,6 +1371,7 @@ function startGPS() {
   document.getElementById('t-map-label').textContent = 'GPS 연결 중...';
   gpsWatch = navigator.geolocation.watchPosition(pos => {
     const {latitude: lat, longitude: lng, accuracy} = pos.coords;
+    lastGpsFixTs = Date.now();   // 신호 건강도 판단용
     document.getElementById('t-map-label').textContent = `정확도 ±${Math.round(accuracy)}m`;
     const coord = [lat, lng];
     gpsCoords.push([lat, lng, pos.timestamp]);
@@ -1326,6 +1406,7 @@ function startGPS() {
         document.getElementById('ts-pace').textContent = `${pm}'${String(ps).padStart(2,'0')}"`;
       }
     }
+    if (running) maybeAdvanceFromGPS();   // 거리 인터벌: 목표 거리 도달 시 즉시 다음 단계
   }, err => {
     // 1=권한거부, 2=위치확인불가, 3=시간초과
     const msg = err && err.code === 1 ? '위치 권한이 거부되었습니다 — 브라우저 설정에서 허용해주세요'
