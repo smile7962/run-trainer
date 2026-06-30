@@ -695,8 +695,11 @@ const PROGS = {
       cool:[{t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:180}]}
   },
   custom: {
-    name:'커스텀', em:'⚙️', desc:'시간과 세트를 직접 설정.',
-    tags:['자유설정'], met:9.0, rec:'자유', steps:[]
+    name:'커스텀', em:'⚙️', desc:'시간·거리·세트를 직접 설정.',
+    tags:['자유설정'], met:9.0, rec:'자유', steps:[],
+    tune:{kind:'interval', mode:'time', warm:120, sets:8, run:60, rest:30, cool:120,
+      runDist:400, pace:330,
+      setsMin:1, setsMax:30, runStep:15, restStep:15}
   }
 };
 const TAG_CLS = {'고강도':'tag-hard','중강도':'tag-med','저강도':'tag-easy'};
@@ -833,22 +836,7 @@ function renderStreakBars(barsId, daysId) {
 }
 
 function selectAndStart(key) {
-  if (key === 'custom') {
-    // 잘못된 입력(빈값/문자/음수)에도 안전하도록 범위 보정
-    const r = Math.min(3600, Math.max(5,  parseInt(prompt('달리기 시간(초):', '60'), 10) || 60));
-    const w = Math.min(3600, Math.max(0,  parseInt(prompt('휴식 시간(초):', '30'), 10) || 30));
-    const s = Math.min(30,   Math.max(1,  parseInt(prompt('세트 수:', '8'),    10) || 8));
-    const cs = [{t:'warm',l:'워밍업',d:120}];
-    for (let i = 0; i < s; i++) {
-      cs.push({t:'run',l:`달리기 ${i+1}`,d:r});
-      if (w > 0) cs.push({t:'rest',l:`휴식 ${i+1}`,d:w});
-    }
-    cs.push({t:'rest',l:'쿨다운',d:120});
-    PROGS.custom.steps = cs;
-    beginWorkout('custom', cs);
-    return;
-  }
-  // 프리셋: 시작 전 시간 조절 시트 열기
+  // 모든 프로그램(커스텀 포함) 동일하게 시작 전 조절 시트 열기
   startKey = key;
   startTune = JSON.parse(JSON.stringify(PROGS[key].tune));  // 기본값 복제(원본 불변)
   renderStartSheet();
