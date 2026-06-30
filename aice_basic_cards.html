@@ -212,6 +212,13 @@
   .collapsible.open::after { content: ' ▴'; }
   .collapse-content { display: none; }
   .collapse-content.open { display: block; }
+
+  /* ── SVG 차트 ── */
+  .chart-svg {
+    width: 100%; height: auto; display: block;
+    background: #12121c; border: 1px solid var(--border);
+    border-radius: 10px; padding: 6px;
+  }
 </style>
 </head>
 <body>
@@ -434,10 +441,21 @@
       <span class="card-num">4/5</span>
     </div>
     <div class="card-body">
-      <div class="grid2">
+      <svg viewBox="0 0 280 110" class="chart-svg">
+        <line x1="10" y1="95" x2="270" y2="95" stroke="#3a3a4a" stroke-width="1"/>
+        <!-- 왜도>0: 왼쪽에 봉우리, 오른쪽 긴 꼬리 (초록) -->
+        <path d="M15,95 C40,95 45,15 75,15 C100,15 110,60 140,80 C170,95 210,93 265,94"
+          fill="none" stroke="#00c9a7" stroke-width="2.5"/>
+        <!-- 왜도<0: 오른쪽에 봉우리, 왼쪽 긴 꼬리 (파랑) -->
+        <path d="M15,94 C70,93 110,95 140,80 C170,60 180,15 205,15 C235,15 240,95 265,95"
+          fill="none" stroke="#45aaf2" stroke-width="2.5"/>
+        <text x="55" y="30" fill="#00c9a7" font-size="11">왜도&gt;0</text>
+        <text x="200" y="30" fill="#45aaf2" font-size="11">왜도&lt;0</text>
+      </svg>
+      <div class="grid2" style="margin-top:8px">
         <div class="mini-card">
           <div class="title">왜도 &gt; 0 (양수)</div>
-          <div class="value" style="color:var(--c3)">오른쪽 꼬리 ▶<br>왼쪽에 집중</div>
+          <div class="value" style="color:var(--c2)">오른쪽 꼬리 ▶<br>왼쪽에 집중</div>
         </div>
         <div class="mini-card">
           <div class="title">왜도 &lt; 0 (음수)</div>
@@ -475,7 +493,19 @@
           <span class="def-desc">상관관계 거의 없음</span>
         </li>
       </ul>
-      <div class="tag-row">
+      <div class="grid2" style="margin-top:10px">
+        <svg viewBox="0 0 90 80" class="chart-svg" style="padding:4px">
+          <g fill="#00c9a7"><circle cx="15" cy="60" r="2.5"/><circle cx="25" cy="50" r="2.5"/><circle cx="30" cy="55" r="2.5"/><circle cx="40" cy="40" r="2.5"/><circle cx="48" cy="35" r="2.5"/><circle cx="55" cy="28" r="2.5"/><circle cx="65" cy="20" r="2.5"/><circle cx="75" cy="15" r="2.5"/></g>
+          <line x1="10" y1="65" x2="80" y2="12" stroke="#00c9a7" stroke-width="1.5" opacity="0.6"/>
+          <text x="20" y="76" fill="#00c9a7" font-size="9">양의 상관</text>
+        </svg>
+        <svg viewBox="0 0 90 80" class="chart-svg" style="padding:4px">
+          <g fill="#fc5c65"><circle cx="15" cy="15" r="2.5"/><circle cx="25" cy="22" r="2.5"/><circle cx="30" cy="20" r="2.5"/><circle cx="40" cy="35" r="2.5"/><circle cx="48" cy="40" r="2.5"/><circle cx="55" cy="48" r="2.5"/><circle cx="65" cy="55" r="2.5"/><circle cx="75" cy="62" r="2.5"/></g>
+          <line x1="10" y1="12" x2="80" y2="65" stroke="#fc5c65" stroke-width="1.5" opacity="0.6"/>
+          <text x="20" y="76" fill="#fc5c65" font-size="9">음의 상관</text>
+        </svg>
+      </div>
+      <div class="tag-row" style="margin-top:8px">
         <span class="tag" style="background:#0d2520;color:var(--c2)">양의 상관 ↗</span>
         <span class="tag" style="background:#27111a;color:var(--c4)">음의 상관 ↘</span>
         <span class="tag">무상관 —</span>
@@ -490,96 +520,212 @@
 ════════════════════════════════════════════ -->
 <div class="group" id="g2">
 
-  <!-- 카드 2-1: 그래프 개요 -->
+  <!-- 카드 2-1: 카운트플롯 -->
   <div class="card" data-g="2">
     <div class="card-head">
       <span class="card-icon">📊</span>
-      <span class="card-title">주요 그래프 5종 한눈에</span>
-      <span class="card-num">1/3</span>
+      <span class="card-title">카운트플롯 (Count Plot)</span>
+      <span class="card-num">1/6</span>
     </div>
     <div class="card-body">
-      <ul class="def-list">
-        <li>
-          <span class="def-term" style="color:var(--c3)">카운트플롯</span>
-          <span class="def-desc">범주형 데이터 빈도 막대 → 분포 파악</span>
-        </li>
-        <li>
-          <span class="def-term" style="color:var(--c3)">히스토그램</span>
-          <span class="def-desc">수치형 데이터 구간별 빈도 → 분포 형태 파악</span>
-        </li>
-        <li>
-          <span class="def-term" style="color:var(--c3)">박스플롯</span>
-          <span class="def-desc">Q1/Q2/Q3/Min/Max + 이상치 → 분포+이상치 한번에</span>
-        </li>
-        <li>
-          <span class="def-term" style="color:var(--c3)">산점도</span>
-          <span class="def-desc">두 변수 관계를 점으로 → 상관관계·패턴·이상치</span>
-        </li>
-        <li>
-          <span class="def-term" style="color:var(--c3)">히트맵</span>
-          <span class="def-desc">변수 간 상관계수를 색상으로 → 관계 한눈에</span>
-        </li>
-      </ul>
+      <svg viewBox="0 0 300 140" class="chart-svg">
+        <line x1="20" y1="120" x2="290" y2="120" stroke="#3a3a4a" stroke-width="1"/>
+        <rect x="35"  y="55"  width="32" height="65" rx="3" fill="#6c63ff"/>
+        <rect x="85"  y="15"  width="32" height="105" rx="3" fill="#fc5c65"/>
+        <rect x="135" y="100" width="32" height="20" rx="3" fill="#00c9a7"/>
+        <rect x="185" y="85"  width="32" height="35" rx="3" fill="#a55eea"/>
+        <rect x="235" y="95"  width="32" height="25" rx="3" fill="#f7b731"/>
+      </svg>
+      <p style="text-align:center;color:var(--sub);font-size:12px;margin-top:4px">범주별 막대 색상이 다름 — 범주형 빈도</p>
+      <div class="tag-row" style="justify-content:center">
+        <span class="tag" style="background:#0d2520;color:var(--c2)">범주형 데이터</span>
+        <span class="tag" style="background:#272010;color:var(--c3)">빈도 = 막대 높이</span>
+      </div>
     </div>
   </div>
 
-  <!-- 카드 2-2: 단일변수 -->
+  <!-- 카드 2-2: 히스토그램 -->
   <div class="card" data-g="2">
     <div class="card-head">
-      <span class="card-icon">1️⃣</span>
-      <span class="card-title">단일 변수 시각화</span>
-      <span class="card-num">2/3</span>
+      <span class="card-icon">📶</span>
+      <span class="card-title">히스토그램 (Histogram)</span>
+      <span class="card-num">2/6</span>
+    </div>
+    <div class="card-body">
+      <svg viewBox="0 0 300 140" class="chart-svg">
+        <line x1="15" y1="120" x2="290" y2="120" stroke="#3a3a4a" stroke-width="1"/>
+        <polyline points="15,118 30,100 45,60 60,25 75,18 90,30 105,50 120,68 135,82 150,92 165,98 180,104 195,108 210,112 225,114 240,116 255,117 270,118 290,119"
+          fill="none" stroke="none"/>
+        <g fill="#6c63ff" opacity="0.85">
+          <rect x="18"  y="112" width="9" height="8"/>
+          <rect x="28"  y="95"  width="9" height="25"/>
+          <rect x="38"  y="55"  width="9" height="65"/>
+          <rect x="48"  y="22"  width="9" height="98"/>
+          <rect x="58"  y="16"  width="9" height="104"/>
+          <rect x="68"  y="28"  width="9" height="92"/>
+          <rect x="78"  y="48"  width="9" height="72"/>
+          <rect x="88"  y="64"  width="9" height="56"/>
+          <rect x="98"  y="76"  width="9" height="44"/>
+          <rect x="108" y="86"  width="9" height="34"/>
+          <rect x="118" y="94"  width="9" height="26"/>
+          <rect x="128" y="100" width="9" height="20"/>
+          <rect x="138" y="104" width="9" height="16"/>
+          <rect x="148" y="108" width="9" height="12"/>
+          <rect x="158" y="111" width="9" height="9"/>
+          <rect x="168" y="113" width="9" height="7"/>
+          <rect x="178" y="115" width="9" height="5"/>
+          <rect x="188" y="116" width="9" height="4"/>
+          <rect x="198" y="117" width="9" height="3"/>
+          <rect x="208" y="118" width="9" height="2"/>
+        </g>
+      </svg>
+      <p style="text-align:center;color:var(--sub);font-size:12px;margin-top:4px">오른쪽 꼬리(우측 치우침) 분포 예시</p>
+      <div class="tag-row" style="justify-content:center">
+        <span class="tag" style="background:#0d2520;color:var(--c2)">수치형 데이터</span>
+        <span class="tag" style="background:#272010;color:var(--c3)">구간(Bin)별 빈도</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 카드 2-3: 박스플롯 -->
+  <div class="card" data-g="2">
+    <div class="card-head">
+      <span class="card-icon">📦</span>
+      <span class="card-title">박스플롯 (Box Plot)</span>
+      <span class="card-num">3/6</span>
+    </div>
+    <div class="card-body">
+      <svg viewBox="0 0 300 150" class="chart-svg">
+        <!-- single labeled box plot -->
+        <line x1="150" y1="10" x2="150" y2="35" stroke="#45aaf2" stroke-width="2"/>
+        <line x1="120" y1="10" x2="180" y2="10" stroke="#45aaf2" stroke-width="2"/>
+        <circle cx="150" cy="6" r="3" fill="#fc5c65"/>
+        <rect x="110" y="35" width="80" height="55" fill="none" stroke="#45aaf2" stroke-width="2"/>
+        <line x1="110" y1="62" x2="190" y2="62" stroke="#f7b731" stroke-width="2"/>
+        <line x1="150" y1="90" x2="150" y2="115" stroke="#45aaf2" stroke-width="2"/>
+        <line x1="120" y1="115" x2="180" y2="115" stroke="#45aaf2" stroke-width="2"/>
+        <circle cx="150" cy="125" r="3" fill="#fc5c65"/>
+        <circle cx="160" cy="132" r="3" fill="#fc5c65"/>
+      </svg>
+      <div class="grid2" style="margin-top:6px">
+        <div class="mini-card"><div class="title">상단 점</div><div class="value">이상치(Outlier)</div></div>
+        <div class="mini-card"><div class="title">박스 위/아래 선</div><div class="value">Q3 / Q1</div></div>
+        <div class="mini-card"><div class="title">노란 가로선</div><div class="value">중앙값(Median)</div></div>
+        <div class="mini-card"><div class="title">박스 밖 세로선</div><div class="value">상단/하단 경계</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 카드 2-4: 산점도 -->
+  <div class="card" data-g="2">
+    <div class="card-head">
+      <span class="card-icon">🔵</span>
+      <span class="card-title">산점도 (Scatter Plot)</span>
+      <span class="card-num">4/6</span>
+    </div>
+    <div class="card-body">
+      <svg viewBox="0 0 300 140" class="chart-svg">
+        <line x1="20" y1="120" x2="290" y2="120" stroke="#3a3a4a" stroke-width="1"/>
+        <line x1="20" y1="10" x2="20" y2="120" stroke="#3a3a4a" stroke-width="1"/>
+        <g fill="#45aaf2" opacity="0.8">
+          <circle cx="28"  cy="20" r="3"/><circle cx="32"  cy="35" r="3"/>
+          <circle cx="38"  cy="18" r="3"/><circle cx="42"  cy="50" r="3"/>
+          <circle cx="48"  cy="60" r="3"/><circle cx="55"  cy="70" r="3"/>
+          <circle cx="62"  cy="78" r="3"/><circle cx="68"  cy="85" r="3"/>
+          <circle cx="75"  cy="90" r="3"/><circle cx="85"  cy="95" r="3"/>
+          <circle cx="95"  cy="100" r="3"/><circle cx="108" cy="103" r="3"/>
+          <circle cx="120" cy="106" r="3"/><circle cx="135" cy="108" r="3"/>
+          <circle cx="150" cy="110" r="3"/><circle cx="170" cy="112" r="3"/>
+          <circle cx="190" cy="113" r="3"/><circle cx="215" cy="114" r="3"/>
+          <circle cx="240" cy="115" r="3"/><circle cx="265" cy="116" r="3"/>
+          <circle cx="60"  cy="55" r="3"/><circle cx="80"  cy="72" r="3"/>
+          <circle cx="100" cy="88" r="3"/><circle cx="130" cy="100" r="3"/>
+        </g>
+      </svg>
+      <p style="text-align:center;color:var(--sub);font-size:12px;margin-top:4px">예: 주행거리↑ → 중고차 가격↓ (음의 상관)</p>
+      <div class="tag-row" style="justify-content:center">
+        <span class="tag" style="background:#0f1e2e;color:var(--c5)">두 변수 관계</span>
+        <span class="tag">패턴 · 이상치 탐색</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 카드 2-5: 히트맵 -->
+  <div class="card" data-g="2">
+    <div class="card-head">
+      <span class="card-icon">🟥</span>
+      <span class="card-title">상관계수 히트맵 (Heatmap)</span>
+      <span class="card-num">5/6</span>
+    </div>
+    <div class="card-body">
+      <svg viewBox="0 0 250 150" class="chart-svg">
+        <g>
+          <rect x="0"   y="0"   width="50" height="30" fill="#7c2d3c"/>
+          <rect x="50"  y="0"   width="50" height="30" fill="#a8556b"/>
+          <rect x="100" y="0"   width="50" height="30" fill="#3a5a8c"/>
+          <rect x="150" y="0"   width="50" height="30" fill="#2d4a7c"/>
+          <rect x="200" y="0"   width="50" height="30" fill="#c97b8a"/>
+
+          <rect x="0"   y="30"  width="50" height="30" fill="#a8556b"/>
+          <rect x="50"  y="30"  width="50" height="30" fill="#7c2d3c"/>
+          <rect x="100" y="30"  width="50" height="30" fill="#e3a9b0"/>
+          <rect x="150" y="30"  width="50" height="30" fill="#5577a8"/>
+          <rect x="200" y="30"  width="50" height="30" fill="#2d4a7c"/>
+
+          <rect x="0"   y="60"  width="50" height="30" fill="#3a5a8c"/>
+          <rect x="50"  y="60"  width="50" height="30" fill="#e3a9b0"/>
+          <rect x="100" y="60"  width="50" height="30" fill="#7c2d3c"/>
+          <rect x="150" y="60"  width="50" height="30" fill="#a8556b"/>
+          <rect x="200" y="60"  width="50" height="30" fill="#5577a8"/>
+
+          <rect x="0"   y="90"  width="50" height="30" fill="#2d4a7c"/>
+          <rect x="50"  y="90"  width="50" height="30" fill="#5577a8"/>
+          <rect x="100" y="90"  width="50" height="30" fill="#a8556b"/>
+          <rect x="150" y="90"  width="50" height="30" fill="#7c2d3c"/>
+          <rect x="200" y="90"  width="50" height="30" fill="#c97b8a"/>
+
+          <rect x="0"   y="120" width="50" height="30" fill="#c97b8a"/>
+          <rect x="50"  y="120" width="50" height="30" fill="#2d4a7c"/>
+          <rect x="100" y="120" width="50" height="30" fill="#5577a8"/>
+          <rect x="150" y="120" width="50" height="30" fill="#c97b8a"/>
+          <rect x="200" y="120" width="50" height="30" fill="#7c2d3c"/>
+        </g>
+      </svg>
+      <div class="row" style="margin-top:6px;justify-content:center;align-items:center">
+        <span style="font-size:11px;color:var(--sub)">음(-) </span>
+        <div style="width:120px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2d4a7c,#a8556b,#7c2d3c)"></div>
+        <span style="font-size:11px;color:var(--sub)"> 양(+)</span>
+      </div>
+      <p style="text-align:center;color:var(--sub);font-size:12px;margin-top:6px">붉은색=양의 상관 / 푸른색=음의 상관</p>
+    </div>
+  </div>
+
+  <!-- 카드 2-6: 선택 가이드 -->
+  <div class="card" data-g="2">
+    <div class="card-head">
+      <span class="card-icon">🧭</span>
+      <span class="card-title">그래프 선택 가이드</span>
+      <span class="card-num">6/6</span>
     </div>
     <div class="card-body">
       <div class="compare">
         <div class="compare-col">
-          <div class="compare-head" style="color:var(--c3)">카운트플롯</div>
+          <div class="compare-head" style="color:var(--c3)">단일 변수</div>
           <div class="compare-body">
-            ✅ 범주형 (Category)<br>
-            예) 성별, 등급<br>
-            빈도(횟수)를 막대 높이로 표현
+            범주형 → 카운트플롯<br>
+            수치형 분포 → 히스토그램<br>
+            분포+이상치 → 박스플롯
           </div>
         </div>
         <div class="compare-col">
-          <div class="compare-head" style="color:var(--c3)">히스토그램</div>
+          <div class="compare-head" style="color:var(--c3)">여러 변수</div>
           <div class="compare-body">
-            ✅ 수치형 (Numeric)<br>
-            예) 나이, 가격<br>
-            구간(Bin)별 데이터 수 표현
+            두 변수 관계 → 산점도<br>
+            전체 변수 상관관계 → 히트맵
           </div>
         </div>
       </div>
-      <div class="tip" style="margin-top:10px">💡 박스플롯도 단일 변수 → Q1/Q2/Q3 + 이상치까지 표현</div>
-    </div>
-  </div>
-
-  <!-- 카드 2-3: 다변수 -->
-  <div class="card" data-g="2">
-    <div class="card-head">
-      <span class="card-icon">2️⃣</span>
-      <span class="card-title">여러 변수 관계 시각화</span>
-      <span class="card-num">3/3</span>
-    </div>
-    <div class="card-body">
-      <div class="compare">
-        <div class="compare-col">
-          <div class="compare-head" style="color:var(--c3)">산점도 (Scatter)</div>
-          <div class="compare-body">
-            두 변수를 x, y 축<br>
-            점으로 관계 표현<br>
-            → 상관관계 / 패턴 / 이상치 탐색
-          </div>
-        </div>
-        <div class="compare-col">
-          <div class="compare-head" style="color:var(--c3)">히트맵 (Heatmap)</div>
-          <div class="compare-body">
-            상관계수를 색으로<br>
-            빨강↔파랑으로 강도 표현<br>
-            → 변수 간 관계 전체 파악
-          </div>
-        </div>
-      </div>
-      <div class="alert" style="margin-top:10px">⚠️ 그래프 선택 기준: 범주형→카운트플롯, 수치형→히스토그램, 두 변수→산점도</div>
+      <div class="alert" style="margin-top:10px">⚠️ 시험 포인트: "범주형이면 카운트플롯, 수치형 분포면 히스토그램" 헷갈리지 않기!</div>
     </div>
   </div>
 
@@ -936,7 +1082,7 @@
   const groups = [
     { id: 'g0', label: 'AI프로세스', count: 3 },
     { id: 'g1', label: '기술통계', count: 5 },
-    { id: 'g2', label: '시각화', count: 3 },
+    { id: 'g2', label: '시각화', count: 6 },
     { id: 'g3', label: '전처리', count: 5 },
     { id: 'g4', label: 'AI모델링', count: 5 },
   ];
