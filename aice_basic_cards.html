@@ -61,9 +61,40 @@
   .tab[data-g="3"].active { border-color: var(--c4); background: #27111a; color: var(--c4); }
   .tab[data-g="4"].active { border-color: var(--c5); background: #0f1e2e; color: var(--c5); }
 
-  /* ── 카드 컨테이너 ── */
+  /* ── 라디오 기반 탭 전환 (JS 불필요, iOS Safari 호환) ── */
+  .tab-radio { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
   .group { display: none; padding: 14px 14px 0; }
-  .group.visible { display: block; }
+  .group.visible { display: block; } /* JS가 있으면 이 클래스도 사용 (보강용) */
+
+  #rtab0:checked ~ .header label[for="rtab0"],
+  #rtab1:checked ~ .header label[for="rtab1"],
+  #rtab2:checked ~ .header label[for="rtab2"],
+  #rtab3:checked ~ .header label[for="rtab3"],
+  #rtab4:checked ~ .header label[for="rtab4"] { color: #fff; }
+  #rtab0:checked ~ .header label[for="rtab0"] { border-color: var(--c1); background: #1e1a33; color: var(--c1); }
+  #rtab1:checked ~ .header label[for="rtab1"] { border-color: var(--c2); background: #0d2520; color: var(--c2); }
+  #rtab2:checked ~ .header label[for="rtab2"] { border-color: var(--c3); background: #272010; color: var(--c3); }
+  #rtab3:checked ~ .header label[for="rtab3"] { border-color: var(--c4); background: #27111a; color: var(--c4); }
+  #rtab4:checked ~ .header label[for="rtab4"] { border-color: var(--c5); background: #0f1e2e; color: var(--c5); }
+
+  #rtab0:checked ~ #g0 { display: block; }
+  #rtab1:checked ~ #g1 { display: block; }
+  #rtab2:checked ~ #g2 { display: block; }
+  #rtab3:checked ~ #g3 { display: block; }
+  #rtab4:checked ~ #g4 { display: block; }
+
+  #rtab0:checked ~ .progress-bar .progress-fill { width: 20%; background: var(--c1); }
+  #rtab1:checked ~ .progress-bar .progress-fill { width: 40%; background: var(--c2); }
+  #rtab2:checked ~ .progress-bar .progress-fill { width: 60%; background: var(--c3); }
+  #rtab3:checked ~ .progress-bar .progress-fill { width: 80%; background: var(--c4); }
+  #rtab4:checked ~ .progress-bar .progress-fill { width: 100%; background: var(--c5); }
+
+  #rtab0:checked ~ .progress-bar .pl0,
+  #rtab1:checked ~ .progress-bar .pl1,
+  #rtab2:checked ~ .progress-bar .pl2,
+  #rtab3:checked ~ .progress-bar .pl3,
+  #rtab4:checked ~ .progress-bar .pl4 { display: inline; }
+  .progress-label span { display: none; }
 
   /* ── 카드 ── */
   .card {
@@ -223,14 +254,21 @@
 </head>
 <body>
 
+<!-- 순수 CSS 탭 전환용 라디오 (JS 없이도 동작) -->
+<input type="radio" name="navtab" id="rtab0" class="tab-radio" checked>
+<input type="radio" name="navtab" id="rtab1" class="tab-radio">
+<input type="radio" name="navtab" id="rtab2" class="tab-radio">
+<input type="radio" name="navtab" id="rtab3" class="tab-radio">
+<input type="radio" name="navtab" id="rtab4" class="tab-radio">
+
 <div class="header">
   <h1>📘 AICE Basic 핵심카드</h1>
   <div class="tabs">
-    <div class="tab active" data-g="0" onclick="showGroup(0)">🤖 AI프로세스</div>
-    <div class="tab" data-g="1" onclick="showGroup(1)">📊 기술통계</div>
-    <div class="tab" data-g="2" onclick="showGroup(2)">📈 시각화</div>
-    <div class="tab" data-g="3" onclick="showGroup(3)">🔧 전처리</div>
-    <div class="tab" data-g="4" onclick="showGroup(4)">🧠 AI모델링</div>
+    <label class="tab" for="rtab0" data-g="0">🤖 AI프로세스</label>
+    <label class="tab" for="rtab1" data-g="1">📊 기술통계</label>
+    <label class="tab" for="rtab2" data-g="2">📈 시각화</label>
+    <label class="tab" for="rtab3" data-g="3">🔧 전처리</label>
+    <label class="tab" for="rtab4" data-g="4">🧠 AI모델링</label>
   </div>
 </div>
 
@@ -1070,46 +1108,19 @@
 
 </div><!-- /g4 -->
 
-<!-- ── 하단 진행바 ── -->
+<!-- ── 하단 진행바 (라디오 :checked 기반, JS 불필요) ── -->
 <div class="progress-bar">
   <div class="progress-track">
-    <div class="progress-fill" id="pFill"></div>
+    <div class="progress-fill"></div>
   </div>
-  <div class="progress-label" id="pLabel"></div>
+  <div class="progress-label">
+    <span class="pl0">AI프로세스 · 3장 | 1/5 탭 (20%)</span>
+    <span class="pl1">기술통계 · 5장 | 2/5 탭 (40%)</span>
+    <span class="pl2">시각화 · 6장 | 3/5 탭 (60%)</span>
+    <span class="pl3">전처리 · 5장 | 4/5 탭 (80%)</span>
+    <span class="pl4">AI모델링 · 5장 | 5/5 탭 (100%)</span>
+  </div>
 </div>
 
-<script>
-  const groups = [
-    { id: 'g0', label: 'AI프로세스', count: 3 },
-    { id: 'g1', label: '기술통계', count: 5 },
-    { id: 'g2', label: '시각화', count: 6 },
-    { id: 'g3', label: '전처리', count: 5 },
-    { id: 'g4', label: 'AI모델링', count: 5 },
-  ];
-  let current = 0;
-
-  function showGroup(idx) {
-    current = idx;
-    groups.forEach((g, i) => {
-      document.getElementById(g.id).classList.toggle('visible', i === idx);
-      document.querySelectorAll('.tab')[i].classList.toggle('active', i === idx);
-    });
-    updateProgress();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function updateProgress() {
-    const g = groups[current];
-    const total = groups.reduce((s, x) => s + x.count, 0);
-    const done = groups.slice(0, current).reduce((s, x) => s + x.count, 0) + g.count;
-    const pct = Math.round(done / total * 100);
-    document.getElementById('pFill').className = 'progress-fill c' + current;
-    document.getElementById('pFill').style.width = pct + '%';
-    document.getElementById('pLabel').textContent =
-      `${g.label} · ${g.count}장 | 전체 ${done}/${total}장 (${pct}%)`;
-  }
-
-  updateProgress();
-</script>
 </body>
 </html>
