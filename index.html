@@ -637,7 +637,7 @@ const PROGS = {
       {t:'run', l:'이지 페이스',d:1200},
       {t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:120}
     ],
-    tune:{kind:'steady',
+    tune:{kind:'steady', mode:'time', runDist:3000, distStep:100, pace:360,
       warm:[{t:'warm',l:'워밍업 걷기',d:180},{t:'warm',l:'느린 조깅',d:300}],
       run:{l:'이지 페이스',d:1200,min:300,max:5400,step:60},
       cool:[{t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:120}]}
@@ -661,7 +661,7 @@ const PROGS = {
       {t:'run',l:'쉬운 조깅',d:240},{t:'run',l:'스프린트',d:45},
       {t:'rest',l:'쿨다운',d:300}
     ],
-    tune:{kind:'scale', scale:1.0, min:0.5, max:2.0, step:0.25,
+    tune:{kind:'scale', mode:'time', pace:360, scale:1.0, min:0.5, max:2.0, step:0.25,
       base:[
         {t:'warm',l:'워밍업 조깅',d:300},
         {t:'run',l:'쉬운 조깅',d:180},{t:'run',l:'빠른 달리기',d:60},
@@ -677,7 +677,7 @@ const PROGS = {
     steps:[
       {t:'warm',l:'워밍업',d:600},{t:'run',l:'템포 페이스',d:1200},{t:'rest',l:'쿨다운',d:600}
     ],
-    tune:{kind:'steady',
+    tune:{kind:'steady', mode:'time', runDist:3000, distStep:100, pace:300,
       warm:[{t:'warm',l:'워밍업',d:600}],
       run:{l:'템포 페이스',d:1200,min:300,max:5400,step:60},
       cool:[{t:'rest',l:'쿨다운',d:600}]}
@@ -689,7 +689,7 @@ const PROGS = {
       {t:'warm',l:'워밍업 걷기',d:300},{t:'run',l:'편안한 달리기',d:2400},
       {t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:180}
     ],
-    tune:{kind:'steady',
+    tune:{kind:'steady', mode:'time', runDist:8000, distStep:500, pace:390,
       warm:[{t:'warm',l:'워밍업 걷기',d:300}],
       run:{l:'편안한 달리기',d:2400,min:600,max:7200,step:120},
       cool:[{t:'rest',l:'쿨다운 조깅',d:300},{t:'rest',l:'마무리 걷기',d:180}]}
@@ -877,7 +877,10 @@ function totalOf(arr) { return arr.reduce((a, s) => a + s.d, 0); }
 // 현재 startTune 으로 steps 생성
 function buildFromTune(t) {
   if (t.kind === 'steady') {
-    return [...t.warm.map(s => ({...s})), {t:'run', l:t.run.l, d:t.run.d}, ...t.cool.map(s => ({...s}))];
+    const runStep = t.mode === 'dist'
+      ? {t:'run', l:t.run.l, d:Math.max(5, Math.round(t.runDist / 1000 * t.pace)), dist:t.runDist}
+      : {t:'run', l:t.run.l, d:t.run.d};
+    return [...t.warm.map(s => ({...s})), runStep, ...t.cool.map(s => ({...s}))];
   }
   if (t.kind === 'interval') {
     const s = [{t:'warm', l:'워밍업', d:t.warm}];
@@ -895,7 +898,13 @@ function buildFromTune(t) {
     return s;
   }
   if (t.kind === 'scale') {
-    return t.base.map(s => s.t === 'run' ? {...s, d:Math.max(5, Math.round(s.d * t.scale))} : {...s});
+    return t.base.map(s => {
+      if (s.t !== 'run') return {...s};
+      const d = Math.max(5, Math.round(s.d * t.scale));
+      // 거리 모드: 블록 시간을 목표 페이스로 거리(m)로 환산해 GPS 종료, d는 폴백 시간
+      if (t.mode === 'dist') return {...s, d, dist:Math.max(20, Math.round(d * 1000 / t.pace))};
+      return {...s, d};
+    });
   }
   return [];
 }
@@ -913,21 +922,38 @@ function fixedRow(label, sec) {
 }
 
 function fmtPace(sec) { return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}/km`; }
+function fmtDist(m) { return m >= 1000 ? (m/1000).toFixed(1) + 'km' : m + 'm'; }
+// 시간 기준 / 거리 기준 토글 (모든 프로그램 공용)
+function modeToggle(t) {
+  return `<div class="st-toggle">`
+    + `<button class="${t.mode==='time'?'on':''}" onclick="tuneSetMode('time')">⏱ 시간 기준</button>`
+    + `<button class="${t.mode==='dist'?'on':''}" onclick="tuneSetMode('dist')">📍 거리 기준</button></div>`;
+}
+// 거리 모드일 때 총 달리기 거리(m)
+function totalRunMeters(built) { return built.filter(s => s.dist).reduce((a, s) => a + s.dist, 0); }
 
 function renderStartSheet() {
   const p = PROGS[startKey], t = startTune;
   document.getElementById('start-title').textContent = `${p.em} ${p.name}`;
   let rows = '';
-  let totalText = `총 ${fmtDur(totalOf(buildFromTune(t)))}`;
+  const built = buildFromTune(t);
+  let totalText = `총 ${fmtDur(totalOf(built))}`;
+  if (t.mode === 'dist') {
+    totalText = `달리기 ${(totalRunMeters(built)/1000).toFixed(1)}km · 예상 ${fmtDur(totalOf(built))}`;
+  }
+
   if (t.kind === 'steady') {
+    rows += modeToggle(t);
     t.warm.forEach(w => rows += fixedRow(w.l, w.d));
-    rows += stepRow('달리기 시간', null, 'run', fmtDur(t.run.d));
+    if (t.mode === 'dist') {
+      rows += stepRow('달리기 거리', `${t.distStep}m 단위`, 'runDist', fmtDist(t.runDist));
+      rows += stepRow('목표 페이스', 'GPS 약할 때 시간 환산 기준', 'pace', fmtPace(t.pace));
+    } else {
+      rows += stepRow('달리기 시간', null, 'run', fmtDur(t.run.d));
+    }
     t.cool.forEach(c => rows += fixedRow(c.l, c.d));
   } else if (t.kind === 'interval') {
-    // 시간 기준 / 거리 기준 토글
-    rows += `<div class="st-toggle">`
-      + `<button class="${t.mode==='time'?'on':''}" onclick="tuneSetMode('time')">⏱ 시간 기준</button>`
-      + `<button class="${t.mode==='dist'?'on':''}" onclick="tuneSetMode('dist')">📍 거리 기준</button></div>`;
+    rows += modeToggle(t);
     rows += fixedRow('워밍업', t.warm);
     rows += stepRow('세트 수', null, 'sets', `${t.sets}세트`);
     if (t.mode === 'dist') {
@@ -938,14 +964,12 @@ function renderStartSheet() {
     }
     rows += stepRow('회복 (각 세트)', null, 'rest', fmtDur(t.rest));
     rows += fixedRow('쿨다운', t.cool);
-    if (t.mode === 'dist') {
-      const km = (t.sets * t.runDist / 1000).toFixed(1);
-      totalText = `달리기 ${km}km · 예상 ${fmtDur(totalOf(buildFromTune(t)))}`;
-    }
   } else if (t.kind === 'scale') {
-    const built = buildFromTune(t);
+    rows += modeToggle(t);
     const runSec = built.filter(s => s.t === 'run').reduce((a, s) => a + s.d, 0);
-    rows += stepRow('달리기 길이', `배율 ×${t.scale.toFixed(2)} · 워밍업/쿨다운 고정`, 'scale', fmtDur(runSec));
+    const runVal = t.mode === 'dist' ? fmtDist(totalRunMeters(built)) : fmtDur(runSec);
+    rows += stepRow('달리기 길이', `배율 ×${t.scale.toFixed(2)} · 워밍업/쿨다운 고정`, 'scale', runVal);
+    if (t.mode === 'dist') rows += stepRow('목표 페이스', '변속 구간을 거리로 환산하는 기준', 'pace', fmtPace(t.pace));
   }
   document.getElementById('start-body').innerHTML = rows;
   document.getElementById('start-total').textContent = totalText;
@@ -953,16 +977,19 @@ function renderStartSheet() {
 
 function tuneAdjust(field, dir) {
   const t = startTune;
-  if (t.kind === 'steady' && field === 'run') {
-    t.run.d = clamp(t.run.d + dir * t.run.step, t.run.min, t.run.max);
+  if (t.kind === 'steady') {
+    if (field === 'run')     t.run.d   = clamp(t.run.d + dir * t.run.step, t.run.min, t.run.max);
+    if (field === 'runDist') t.runDist = clamp(t.runDist + dir * t.distStep, 500, 42000);
+    if (field === 'pace')    t.pace    = clamp(t.pace + dir * 15, 180, 600);
   } else if (t.kind === 'interval') {
     if (field === 'sets')    t.sets    = clamp(t.sets + dir, t.setsMin, t.setsMax);
     if (field === 'run')     t.run     = clamp(t.run + dir * t.runStep, 15, 600);
     if (field === 'rest')    t.rest    = clamp(t.rest + dir * t.restStep, 0, 300);
     if (field === 'runDist') t.runDist = clamp(t.runDist + dir * 100, 100, 3000);   // 100m 단위
     if (field === 'pace')    t.pace    = clamp(t.pace + dir * 15, 180, 600);         // 15초 단위
-  } else if (t.kind === 'scale' && field === 'scale') {
-    t.scale = clamp(+(t.scale + dir * t.step).toFixed(2), t.min, t.max);
+  } else if (t.kind === 'scale') {
+    if (field === 'scale') t.scale = clamp(+(t.scale + dir * t.step).toFixed(2), t.min, t.max);
+    if (field === 'pace')  t.pace  = clamp(t.pace + dir * 15, 180, 600);
   }
   renderStartSheet();
 }
