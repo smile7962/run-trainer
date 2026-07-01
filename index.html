@@ -95,6 +95,8 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
 
 .t-phasebar{height:3px;background:rgba(255,255,255,.08);flex-shrink:0;margin-top:10px;}
 .t-phasefill{height:100%;background:var(--run);transition:width .6s ease,background .3s;}
+.t-away-banner{display:none;flex-shrink:0;margin:8px 12px 0;padding:9px 12px;border-radius:10px;background:rgba(240,165,0,.16);border:1px solid rgba(240,165,0,.4);color:#ffd060;font-size:.74rem;line-height:1.4;cursor:pointer;}
+.t-away-banner.show{display:block;}
 
 .t-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;}
 .t-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 16px;border-radius:20px;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:16px;}
@@ -432,6 +434,7 @@ html,body{height:100%;background:var(--paper);color:var(--ink);font-family:'Inte
     </div>
   </div>
   <div class="t-phasebar"><div class="t-phasefill" id="t-phasefill" style="width:0%"></div></div>
+  <div class="t-away-banner" id="away-banner" onclick="hideAwayBanner()"></div>
 
   <div class="t-center">
     <div class="t-badge b-warm" id="t-badge">☀️ 준비</div>
@@ -731,6 +734,8 @@ let selectedRPE = null;          // RPE 모달에서 선택된 강도(저장 전
 let startKey = null, startTune = null;   // 시작 전 시간 조절 시트 상태
 let phaseStartDist = 0;                   // 거리 인터벌: 현재 구간 시작 시점의 누적거리(km)
 let lastGpsFixTs = 0;                      // 마지막 GPS 수신 시각 (신호 건강도 판단)
+let hiddenAt = 0;                          // 백그라운드로 나간 시각(ms). 0이면 이탈 아님
+let awayBannerTimer = null;                // 이탈 안내 배너 자동 숨김 타이머
 let mapRotate = localStorage.getItem('run-maprotate') !== '0'; // 기본: 진행방향 회전 ON
 
 // ════════════════════════════════════════
@@ -1478,6 +1483,28 @@ function releaseWakeLock() {
 }
 
 // ════════════════════════════════════════
+// 백그라운드 이탈 안내 배너
+// ════════════════════════════════════════
+function showAwayBanner(sec) {
+  const el = document.getElementById('away-banner');
+  if (!el) return;
+  const dur = sec < 60 ? `${sec}초` : fmtDur(sec);   // 기존 fmtDur 재사용
+  // GPS를 쓰는 운동이면 거리 누락까지 안내, 아니면 알림 누락만 안내
+  const usedGPS = gpsCoords.length > 0;
+  el.textContent = usedGPS
+    ? `⚠️ ${dur} 동안 화면을 벗어났어요 · 그동안 GPS 거리·경로는 기록되지 않았어요 (운동 시간은 정상 반영)`
+    : `⚠️ ${dur} 동안 화면을 벗어났어요 · 구간 전환 알림이 울리지 않았을 수 있어요 (시간은 정상 반영)`;
+  el.classList.add('show');
+  clearTimeout(awayBannerTimer);
+  awayBannerTimer = setTimeout(hideAwayBanner, 7000);  // 7초 후 자동 숨김
+}
+function hideAwayBanner() {
+  const el = document.getElementById('away-banner');
+  if (el) el.classList.remove('show');
+  clearTimeout(awayBannerTimer);
+}
+
+// ════════════════════════════════════════
 // AUDIO & VIBRATION
 // ════════════════════════════════════════
 function beep(type) {
@@ -1742,8 +1769,18 @@ function calcStreak(hist) {
 // INIT
 // ════════════════════════════════════════
 // 백그라운드에서 돌아오면: 흐른 시간 따라잡기(#1) + 자동 해제된 화면잠금 재획득(#8)
+// + 러닝 중 다른 앱으로 이탈했다 돌아오면 GPS 기록 누락 안내 배너 표시
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && running) { tick(); requestWakeLock(); }
+  if (document.hidden) {
+    if (running) hiddenAt = Date.now();     // 러닝 중 이탈 시각 기록
+  } else if (running) {
+    if (hiddenAt) {
+      const awaySec = Math.round((Date.now() - hiddenAt) / 1000);
+      if (awaySec >= 5) showAwayBanner(awaySec);   // 5초 이상만 안내(짧은 깜빡임 무시)
+      hiddenAt = 0;
+    }
+    tick(); requestWakeLock();               // 기존 동작(시간 보정 + 화면잠금 재획득)
+  }
 });
 // 일시정지 시트 바깥 영역을 누르면 '계속하기'로 처리
 document.getElementById('pause-modal').addEventListener('click', e => {
